@@ -1,0 +1,6 @@
+{
+  "name": "Bookshelf",
+  "description": "Um aplicativo elegante para organizar suas leituras, com controle de status, avaliações com estrelas e registro de resenhas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

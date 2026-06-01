@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with avatar and custom username",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "Email address of the owner" },
+        "name": { "type": "string", "description": "Display name or nickname" },
+        "avatarUrl": { "type": "string", "description": "Web URL to user avatar photo" }
+      },
+      "required": ["email", "name", "avatarUrl"]
+    },
+    "BookReview": {
+      "title": "BookReview",
+      "description": "Evaluation of a book, including notes, rating, and status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique key or Firestore document ID" },
+        "title": { "type": "string", "description": "Title of the book evaluated" },
+        "author": { "type": "string", "description": "Author of the book" },
+        "status": { "type": "string", "enum": ["LENDO", "CONCLUÍDO", "PAUSADO"], "description": "Reading progress status" },
+        "rating": { "type": "number", "description": "Star rating out of 5" },
+        "coverUrl": { "type": "string", "description": "Web URL to book cover graphic" },
+        "reviewText": { "type": "string", "description": "Textual write-up review comments" },
+        "tags": { "type": "array", "description": "Array of categorized hashtag strings" },
+        "isFavorite": { "type": "boolean", "description": "Marker if saved as favorite" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Review registration timestamp" },
+        "userId": { "type": "string", "description": "The Firestore UID of the owner" }
+      },
+      "required": [
+        "id",
+        "title",
+        "author",
+        "status",
+        "rating",
+        "coverUrl",
+        "reviewText",
+        "tags",
+        "isFavorite",
+        "createdAt",
+        "userId"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual user accounts with custom profiles"
+    },
+    "/users/{userId}/reviews/{reviewId}": {
+      "schema": "BookReview",
+      "description": "Underlying storage for each user's book review documents"
+    }
+  }
+}

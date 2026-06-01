@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default deny everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Standard Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation for UserProfile
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['email', 'name', 'avatarUrl'])
+        && data.keys().size() == 3
+        && data.email is string && data.email.size() <= 256
+        && data.name is string && data.name.size() <= 128
+        && data.avatarUrl is string && data.avatarUrl.size() <= 1500000; // Allow larger strings for base64 uploads
+    }
+
+    // Validation for BookReview
+    function isValidBookReview(data) {
+      return data.keys().hasAll(['id', 'title', 'author', 'status', 'rating', 'coverUrl', 'reviewText', 'tags', 'isFavorite', 'createdAt', 'userId'])
+        && data.keys().size() == 11
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 500
+        && data.author is string && data.author.size() <= 500
+        && (data.status == 'LENDO' || data.status == 'CONCLUÍDO' || data.status == 'PAUSADO')
+        && data.rating is number && data.rating >= 0 && data.rating <= 5
+        && data.coverUrl is string && data.coverUrl.size() <= 1500000
+        && data.reviewText is string && data.reviewText.size() <= 100000
+        && data.tags is list && data.tags.size() <= 30
+        && data.isFavorite is bool
+        && data.createdAt is string && data.createdAt.size() <= 128
+        && data.userId is string && data.userId.size() <= 128
+        && data.userId == request.auth.uid;
+    }
+
+    // Match users
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidUserProfile(incoming());
+    }
+
+    // Match nested reviews collection
+    match /users/{userId}/reviews/{reviewId} {
+      allow list: if isSignedIn() && request.auth.uid == userId;
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(reviewId);
+      allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(reviewId);
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(reviewId) && isValidBookReview(incoming());
+    }
+  }
+}
