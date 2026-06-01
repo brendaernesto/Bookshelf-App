@@ -25,15 +25,25 @@ interface FirestoreErrorInfo {
   path: string | null;
   authInfo: {
     userId?: string | null;
-    email?: string | null;
+    emailMasked?: string | null;
     emailVerified?: boolean | null;
     isAnonymous?: boolean | null;
     tenantId?: string | null;
     providerInfo?: {
       providerId?: string | null;
-      email?: string | null;
+      emailMasked?: string | null;
     }[];
   }
+}
+
+function maskEmail(email?: string | null): string | null {
+  if (!email) return null;
+  const parts = email.split('@');
+  if (parts.length !== 2) return '***';
+  const prefix = parts[0];
+  const domain = parts[1];
+  if (prefix.length <= 2) return '***@' + domain;
+  return prefix[0] + '***' + prefix[prefix.length - 1] + '@' + domain;
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
@@ -41,13 +51,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
+      emailMasked: maskEmail(auth.currentUser?.email),
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
       providerInfo: auth.currentUser?.providerData?.map(provider => ({
         providerId: provider.providerId,
-        email: provider.email,
+        emailMasked: maskEmail(provider.email),
       })) || []
     },
     operationType,
