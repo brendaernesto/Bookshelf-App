@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { BookReview } from '../types';
 import { TRANSLATIONS, Language } from '../translations';
+import { db } from '../firebase';
+import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 
 interface ExploreViewProps {
   onAddPresetToList: (title: string, author: string, coverUrl: string) => void;
@@ -120,12 +122,182 @@ export default function ExploreView({ onAddPresetToList, language }: ExploreView
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
+  // New Global Book Search States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchedBooks, setSearchedBooks] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Localized messages for the Search subsection
+  const SEARCH_T = {
+    pt: {
+      TITLE: 'Busca Global de Livros',
+      SUBTITLE: 'Encontre qualquer obra disponível mundialmente e adicione instantaneamente à sua estante.',
+      PLACEHOLDER: 'Busque por título, autor, assunto ou ISBN...',
+      BUTTON_SEARCH: 'Buscar',
+      SEARCHING: 'Procurando obras no acervo mundial...',
+      NO_RESULTS: 'Nenhum livro encontrado mundialmente com esse termo. Tente outro termo.',
+      RESULTS_FOUND: 'Resultados Encontrados',
+      ENTER_TERM: 'Digite um termo para começar a explorar o acervo mundial.',
+      RATING_LABEL: 'Média de avaliações globais'
+    },
+    en: {
+      TITLE: 'Global Book Search',
+      SUBTITLE: 'Find any book available worldwide and instantly add it to your shelf.',
+      PLACEHOLDER: 'Search by title, author, subject, or ISBN...',
+      BUTTON_SEARCH: 'Search',
+      SEARCHING: 'Searching books globally...',
+      NO_RESULTS: 'No books found globally for this query. Try different keywords.',
+      RESULTS_FOUND: 'Search Results',
+      ENTER_TERM: 'Type some keywords to start searching the worldwide catalog.',
+      RATING_LABEL: 'Global average rating'
+    },
+    es: {
+      TITLE: 'Búsqueda Global de Libros',
+      SUBTITLE: 'Encuentra cualquier obra disponible mundialmente y agrégala instantáneamente a tu estantería.',
+      PLACEHOLDER: 'Busca por título, autor, tema o ISBN...',
+      BUTTON_SEARCH: 'Buscar',
+      SEARCHING: 'Buscando libros en el catálogo mundial...',
+      NO_RESULTS: 'No se encontraron libros mundialmente. Intente con otras palabras.',
+      RESULTS_FOUND: 'Resultados Encontrados',
+      ENTER_TERM: 'Escribe algunas palabras para buscar en el catálogo mundial.',
+      RATING_LABEL: 'Calificación promedio global'
+    }
+  }[language] || {
+    TITLE: 'Busca Global de Livros',
+    SUBTITLE: 'Encontre qualquer obra disponível mundialmente e adicione instantaneamente à sua estante.',
+    PLACEHOLDER: 'Busque por título, autor, assunto ou ISBN...',
+    BUTTON_SEARCH: 'Buscar',
+    SEARCHING: 'Procurando obras no acervo mundial...',
+    NO_RESULTS: 'Nenhum livro encontrado mundialmente com esse termo. Tente outro termo.',
+    RESULTS_FOUND: 'Resultados Encontrados',
+    ENTER_TERM: 'Digite um termo para começar a explorar o acervo mundial.',
+    RATING_LABEL: 'Média de avaliações globais'
+  };
+
   const t = TRANSLATIONS[language];
   const quotesList = LOCALIZED_QUOTES[language] || LOCALIZED_QUOTES.pt;
   const trendingBooks = LOCALIZED_TRENDING[language] || LOCALIZED_TRENDING.pt;
 
   const rotateQuote = () => {
     setQuoteIndex((prev) => (prev + 1) % quotesList.length);
+  };
+
+  const executeSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchTerm.trim()) return;
+
+    setIsSearching(true);
+    setSearchError(null);
+    setHasSearched(true);
+
+    try {
+      // 1. Local-first database lookups: Query cached/fed books in Firestore
+      let cachedMatches: any[] = [];
+      try {
+        const qSnapshot = await getDocs(collection(db, 'books'));
+        qSnapshot.forEach((docSnap) => {
+          const item = docSnap.data();
+          const matchesTitle = item.title?.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchesAuthor = item.author?.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchesTags = Array.isArray(item.tags) && item.tags.some((tg: string) => tg.toLowerCase().includes(searchTerm.toLowerCase()));
+          if (matchesTitle || matchesAuthor || matchesTags) {
+            cachedMatches.push({
+              id: item.id,
+              title: item.title,
+              author: item.author,
+              coverUrl: item.coverUrl,
+              rating: item.rating || 4.2,
+              snippet: item.snippet || '',
+              tags: item.tags || [],
+              buyLink: item.buyLink || '',
+              buyLinkText: item.buyLinkText || ''
+            });
+          }
+        });
+      } catch (cacheErr) {
+        console.warn("Could not retrieve books from Firestore cache local store:", cacheErr);
+      }
+
+      // 2. Full-stack robust web and Google Search grounding query
+      const apiRes = await fetch(`/api/books/search?q=${encodeURIComponent(searchTerm)}&lang=${language}`);
+      if (!apiRes.ok) {
+        let serverErrMessage = '';
+        try {
+          const errPayload = await apiRes.json();
+          serverErrMessage = errPayload.error || errPayload.message;
+        } catch (_) {}
+
+        throw new Error(
+          serverErrMessage || (language === 'pt' 
+            ? 'Erro ao consultar o servidor da web especializado em livros.' 
+            : language === 'es' 
+              ? 'Error al consultar el servidor especializado en livros.' 
+              : 'Failed to access fullstack web book search.')
+        );
+      }
+
+
+      const apiData = await apiRes.json();
+      const serverBooks = apiData.books || [];
+
+      // 3. Feeding search grounding data back into Firestore database
+      const newlyIntegrated: any[] = [];
+      for (const rawBook of serverBooks) {
+        const cleanId = rawBook.id || `book-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        const cleanBook = {
+          id: cleanId,
+          title: rawBook.title || 'Título Indisponível',
+          author: rawBook.author || 'Autor Desconhecido',
+          coverUrl: rawBook.coverUrl || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=300&auto=format&fit=crop',
+          rating: Number(rawBook.rating) || 4.2,
+          snippet: rawBook.snippet || '',
+          tags: Array.isArray(rawBook.tags) ? rawBook.tags : ['#WebFinder', '#Global'],
+          buyLink: rawBook.buyLink || '',
+          buyLinkText: rawBook.buyLinkText || (language === 'pt' ? 'Ver Site de Venda' : language === 'es' ? 'Ver Sitio de Venta' : 'Visit Store'),
+          createdAt: new Date().toISOString()
+        };
+
+        // Persist the book inside Firestore global books repository to feed/integrate data
+        try {
+          await setDoc(doc(db, 'books', cleanBook.id), {
+            id: cleanBook.id,
+            title: cleanBook.title,
+            author: cleanBook.author,
+            coverUrl: cleanBook.coverUrl,
+            rating: cleanBook.rating,
+            snippet: cleanBook.snippet,
+            tags: cleanBook.tags,
+            buyLink: cleanBook.buyLink,
+            buyLinkText: cleanBook.buyLinkText,
+            createdAt: cleanBook.createdAt
+          });
+        } catch (dbErr) {
+          console.warn(`Could not sync grounded book "${cleanBook.title}" to Firestore:`, dbErr);
+        }
+
+        newlyIntegrated.push(cleanBook);
+      }
+
+      // 4. Merge server list and database local matches (dedupe items based on title / id identifier)
+      const mergedBooks = [...newlyIntegrated];
+      cachedMatches.forEach((cachedB) => {
+        const alreadyHas = mergedBooks.some(
+          x => x.id === cachedB.id || x.title.toLowerCase() === cachedB.title.toLowerCase()
+        );
+        if (!alreadyHas) {
+          mergedBooks.push(cachedB);
+        }
+      });
+
+      setSearchedBooks(mergedBooks);
+    } catch (err: any) {
+      console.warn('Global grounding search query failed:', err);
+      setSearchError(err.message || 'Error connecting to search services.');
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleQuickAdd = (title: string, author: string, coverUrl: string) => {
@@ -164,6 +336,141 @@ export default function ExploreView({ onAddPresetToList, language }: ExploreView
             {t.NEXT_INSPIRATION}
           </button>
         </div>
+      </section>
+
+      {/* GLOBAL BOOK DISCOVERY SEARCH COMPONENT */}
+      <section className="bg-surface-container-low p-5 rounded-2xl border border-[#bf6fe5]/30 space-y-4 shadow-md" id="global-book-search-section">
+        <div className="space-y-1">
+          <h4 className="text-sm font-bold text-[#ebdfea] tracking-wide uppercase flex items-center gap-1.5">
+            <span className="material-symbols-outlined notranslate text-[#bf6fe5] text-lg" translate="no">globe_uk</span>
+            {SEARCH_T.TITLE}
+          </h4>
+          <p className="text-[11px] text-on-surface-variant leading-relaxed">
+            {SEARCH_T.SUBTITLE}
+          </p>
+        </div>
+
+        {/* Beautiful Search Input Field */}
+        <form onSubmit={executeSearch} className="flex gap-2">
+          <div className="relative flex-1">
+            <span className="material-symbols-outlined notranslate text-on-surface-variant/50 text-base absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" translate="no">search</span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={SEARCH_T.PLACEHOLDER}
+              className="w-full bg-surface-container-lowest text-xs text-on-surface placeholder:text-on-surface-variant/40 pl-9 pr-4 py-2.5 rounded-xl border border-outline-variant/30 focus:outline-none focus:border-[#bf6fe5] focus:ring-1 focus:ring-[#bf6fe5] transition-all font-sans"
+              id="global-search-query-input"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isSearching || !searchTerm.trim()}
+            className="bg-[#bf6fe5] hover:bg-[#a14ac9] active:scale-95 disabled:bg-[#bf6fe5]/25 disabled:text-on-surface-variant/40 disabled:scale-100 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1 cursor-pointer border-0"
+          >
+            {isSearching ? (
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <span className="material-symbols-outlined notranslate text-sm" translate="no">travel_explore</span>
+            )}
+            <span>{SEARCH_T.BUTTON_SEARCH}</span>
+          </button>
+        </form>
+
+        {/* Global Catalog Search Results Area */}
+        {isSearching ? (
+          <div className="py-8 flex flex-col items-center justify-center gap-2">
+            <div className="w-6 h-6 border-2 border-[#bf6fe5] border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-[11px] text-on-surface-variant animate-pulse">{SEARCH_T.SEARCHING}</p>
+          </div>
+        ) : searchError ? (
+          <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-[11px] text-red-300">
+            {searchError}
+          </div>
+        ) : hasSearched && searchedBooks.length === 0 ? (
+          <div className="bg-surface-container-lowest/50 p-6 rounded-xl text-center text-xs text-on-surface-variant/70 italic border border-outline-variant/10">
+            {SEARCH_T.NO_RESULTS}
+          </div>
+        ) : searchedBooks.length > 0 ? (
+          <div className="space-y-3">
+            <h5 className="text-[10px] font-bold uppercase tracking-wider text-[#dfb9ed] pl-1">
+              ✨ {SEARCH_T.RESULTS_FOUND} ({searchedBooks.length})
+            </h5>
+            
+            <div className="max-h-[380px] overflow-y-auto pr-1 space-y-3 scrollbar-thin">
+              {searchedBooks.map((book) => (
+                <div
+                  key={book.id}
+                  className="bg-surface-container-lowest p-3 rounded-xl border border-outline-variant/10 flex gap-3.5 hover:border-[#bf6fe5]/40 transition-colors"
+                >
+                  <img
+                    src={book.coverUrl}
+                    alt={book.title}
+                    referrerPolicy="no-referrer"
+                    className="w-12 h-18 object-cover rounded shadow-sm shrink-0 bg-surface-container-high"
+                  />
+
+                  <div className="flex flex-col justify-between flex-1 min-w-0">
+                    <div>
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="font-serif text-xs font-bold text-on-surface truncate pr-1" title={book.title}>
+                          {book.title}
+                        </h4>
+                        <span 
+                          className="text-[9px] font-bold bg-[#bf6fe5]/20 text-[#e9b3ff] px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0"
+                          title={SEARCH_T.RATING_LABEL}
+                        >
+                          ★ {book.rating.toFixed(1)}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-on-surface-variant italic mt-0.5 truncate" title={book.author}>{book.author}</p>
+                      <p className="text-[10px] text-on-surface-variant/70 line-clamp-2 mt-1 leading-relaxed">
+                        {book.snippet}
+                      </p>
+                    </div>
+
+                    <div className="flex justify-between items-center mt-2 pt-1.5 gap-2 border-t border-outline-variant/5">
+                      <div className="flex gap-1 truncate max-w-[45%]">
+                        {book.tags.map((tg: string, i: number) => (
+                          <span key={i} className="text-[8px] bg-surface-container text-[#dfb9ed] px-1 py-0.2 rounded font-mono">
+                            {tg}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {book.buyLink && (
+                          <a
+                            href={book.buyLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-[#bf6fe5]/15 hover:bg-[#bf6fe5]/25 border border-[#bf6fe5]/30 text-[#e9b3ff] text-[9px] font-bold px-2 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-0.5 hover:text-white"
+                            title={book.buyLinkText}
+                          >
+                            <span className="material-symbols-outlined notranslate text-[11px]" translate="no">shopping_bag</span>
+                            <span>{book.buyLinkText || 'Loja'}</span>
+                          </a>
+                        )}
+
+                        <button
+                          onClick={() => handleQuickAdd(book.title, book.author, book.coverUrl)}
+                          className="shrink-0 bg-primary hover:bg-primary-container text-on-primary text-[9px] font-bold px-2.5 py-1 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-0.5 shadow-sm border-0"
+                        >
+                          <span className="material-symbols-outlined notranslate text-[11px]" translate="no">add</span>
+                          {t.ADD_TO_SHELF}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-[11px] text-on-surface-variant/60 font-serif italic text-center py-2">
+            {SEARCH_T.ENTER_TERM}
+          </p>
+        )}
       </section>
 
       {/* Success alert message */}

@@ -43,6 +43,69 @@ const PRESET_AVATARS = [
   }
 ];
 
+const PRESET_BANNER_COLORS = [
+  { name: 'Lilás', nameEn: 'Lilac', nameEs: 'Lila', value: '#bf6fe5' },
+  { name: 'Vinho', nameEn: 'Wine', nameEs: 'Vino', value: '#501b3c' },
+  { name: 'Oceano', nameEn: 'Ocean', nameEs: 'Océano', value: '#1a4c6e' },
+  { name: 'Esmeralda', nameEn: 'Emerald', nameEs: 'Esmeralda', value: '#1a5c3e' },
+  { name: 'Slate', nameEn: 'Slate', nameEs: 'Slate', value: '#374151' },
+  { name: 'Ouro', nameEn: 'Gold', nameEs: 'Oro', value: '#b58b09' },
+  { name: 'Sunset', nameEn: 'Sunset', nameEs: 'Sunset', value: '#b83b1d' }
+];
+
+const PRESET_BANNER_IMAGES = [
+  { name: 'Biblioteca', nameEn: 'Library', nameEs: 'Biblioteca', url: 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?q=80&w=600&auto=format&fit=crop' },
+  { name: 'Páginas', nameEn: 'Pages', nameEs: 'Páginas', url: 'https://images.unsplash.com/photo-1474366521946-c3d4b507abf2?q=80&w=600&auto=format&fit=crop' },
+  { name: 'Escritório', nameEn: 'Office', nameEs: 'Oficina', url: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=600&auto=format&fit=crop' },
+  { name: 'Espaço', nameEn: 'Space', nameEs: 'Espacio', url: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=600&auto=format&fit=crop' },
+  { name: 'Aquarela', nameEn: 'Watercolor', nameEs: 'Acuarela', url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=600&auto=format&fit=crop' }
+];
+
+const BANNER_REG = {
+  pt: {
+    SECTION_TITLE: "Banner de Fundo do Perfil",
+    TYPE_LABEL: "Estilo do Banner:",
+    TYPE_NONE: "Sem Banner (Cor tradicional)",
+    TYPE_COLOR: "Cor Sólida",
+    TYPE_IMAGE: "Foto ou Imagem",
+    SOLID_HEX_LABEL: "Tom de Cor / Código Hex:",
+    PHOTO_URL_LABEL: "Cole o link (URL) da imagem desejada:",
+    PHOTO_UPLOAD_LABEL: "Ou envie um arquivo do seu aparelho:",
+    PRESET_COLORS: "Paleta de Cores Recomendadas",
+    PRESET_PHOTOS: "Biblioteca de Sugestões Gratuitas",
+    APPLY_LABEL: "Aplicar Link",
+    CHOOSE_FILE_LABEL: "Adicionar Foto"
+  },
+  en: {
+    SECTION_TITLE: "Profile Background Banner",
+    TYPE_LABEL: "Banner Style:",
+    TYPE_NONE: "No Banner (Traditional theme)",
+    TYPE_COLOR: "Solid Color",
+    TYPE_IMAGE: "Picture or Photo",
+    SOLID_HEX_LABEL: "Color Tone / Hex Code:",
+    PHOTO_URL_LABEL: "Paste background image link (URL):",
+    PHOTO_UPLOAD_LABEL: "Or upload a file from your device:",
+    PRESET_COLORS: "Recommended Dynamic Colors",
+    PRESET_PHOTOS: "Free Background Suggestions",
+    APPLY_LABEL: "Apply Link",
+    CHOOSE_FILE_LABEL: "Upload Picture"
+  },
+  es: {
+    SECTION_TITLE: "Banner de Fondo de Perfil",
+    TYPE_LABEL: "Estilo del Banner:",
+    TYPE_NONE: "Sin Banner (Color tradicional)",
+    TYPE_COLOR: "Color Sólido",
+    TYPE_IMAGE: "Foto o Imagen",
+    SOLID_HEX_LABEL: "Tono de Color / Código Hex:",
+    PHOTO_URL_LABEL: "Pega el enlace (URL) de la imagen:",
+    PHOTO_UPLOAD_LABEL: "O sube un archivo de tu dispositivo:",
+    PRESET_COLORS: "Paleta de Colores Recomendados",
+    PRESET_PHOTOS: "Sugerencias de Fondos Gratis",
+    APPLY_LABEL: "Aplicar Enlace",
+    CHOOSE_FILE_LABEL: "Subir Foto"
+  }
+};
+
 export default function ProfileView({ profile, reviews, onLogout, onUpdateProfile, language }: ProfileViewProps) {
   const isAdmin = profile.email?.toLowerCase() === 'brendaernesto27@gmail.com';
   const [visitStats, setVisitStats] = useState<{ date: string; count: number }[]>([]);
@@ -119,6 +182,8 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
   const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [editName, setEditName] = useState(profile.name);
   const [editAvatarUrl, setEditAvatarUrl] = useState(profile.avatarUrl);
+  const [editBannerType, setEditBannerType] = useState<'none' | 'color' | 'image'>(profile.bannerType || 'none');
+  const [editBannerValue, setEditBannerValue] = useState(profile.bannerValue || '');
   const [showPresets, setShowPresets] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [tempUrl, setTempUrl] = useState('');
@@ -172,7 +237,9 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
     onUpdateProfile({
       ...profile,
       name: editName.trim(),
-      avatarUrl: editAvatarUrl
+      avatarUrl: editAvatarUrl,
+      bannerType: editBannerType,
+      bannerValue: editBannerValue
     });
     setIsEditing(false);
     setShowPresets(false);
@@ -190,39 +257,60 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
     <div className="w-full max-w-2xl mx-auto pb-32 space-y-6 animate-in fade-in duration-300">
       
       {/* Profile Header card & Editor block */}
-      <section className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/30 relative">
+      <section className="bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden">
         {!isEditing ? (
-          <div className="flex flex-col items-center text-center">
-            <button
-              onClick={() => {
-                setEditName(profile.name);
-                setEditAvatarUrl(profile.avatarUrl);
-                setIsEditing(true);
-              }}
-              className="absolute top-4 right-4 bg-primary/10 hover:bg-primary/25 text-primary text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-              title={t.EDIT_PROFILE}
-            >
-              <span className="material-symbols-outlined notranslate text-[13px]" translate="no">edit</span>
-              {t.EDIT_PROFILE}
-            </button>
+          <div>
+            {/* Optional Background Banner */}
+            {profile.bannerType && profile.bannerType !== 'none' ? (
+              <div className="h-32 w-full relative">
+                {profile.bannerType === 'color' ? (
+                  <div className="w-full h-full text-white font-serif flex items-center justify-center font-bold text-xs" style={{ backgroundColor: profile.bannerValue || '#231e25' }}></div>
+                ) : (
+                  <img
+                    src={profile.bannerValue || 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?q=80&w=600&auto=format&fit=crop'}
+                    alt="Banner"
+                    className="w-full h-full object-cover animate-fadeIn"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-surface-container-low/90 via-transparent to-black/15"></div>
+              </div>
+            ) : null}
 
-            <div className="w-20 h-20 rounded-full bg-primary-container/30 border-2 border-[#bf6fe5] overflow-hidden shadow-md flex items-center justify-center">
-              <img
-                src={profile.avatarUrl}
-                alt={profile.name}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
+            <div className={`flex flex-col items-center text-center relative ${profile.bannerType && profile.bannerType !== 'none' ? 'p-6 pt-0' : 'p-6'}`}>
+              <button
+                onClick={() => {
+                  setEditName(profile.name);
+                  setEditAvatarUrl(profile.avatarUrl);
+                  setEditBannerType(profile.bannerType || 'none');
+                  setEditBannerValue(profile.bannerValue || '');
+                  setIsEditing(true);
+                }}
+                className="absolute top-4 right-4 bg-primary/10 backdrop-blur-md hover:bg-primary/25 text-primary text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 z-20"
+                title={t.EDIT_PROFILE}
+              >
+                <span className="material-symbols-outlined notranslate text-[13px]" translate="no">edit</span>
+                {t.EDIT_PROFILE}
+              </button>
+
+              <div className={`${profile.bannerType && profile.bannerType !== 'none' ? '-mt-12 border-4 border-surface-container-low shadow-xl' : 'border-2 border-[#bf6fe5] shadow-md'} z-10 w-20 h-20 rounded-full bg-[#1e1124] overflow-hidden flex items-center justify-center transition-all`}>
+                <img
+                  src={profile.avatarUrl}
+                  alt={profile.name}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <h2 className="font-serif text-lg font-bold text-on-surface mt-3">{profile.name}</h2>
+              <p className="text-xs text-on-surface-variant font-mono">{profile.email}</p>
+
+              <span className="bg-[#bf6fe5]/15 text-[#e9b3ff] text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full mt-3 border border-[#bf6fe5]/15">
+                {t.LEVEL}
+              </span>
             </div>
-            <h2 className="font-serif text-lg font-bold text-on-surface mt-3">{profile.name}</h2>
-            <p className="text-xs text-on-surface-variant font-mono">{profile.email}</p>
-
-            <span className="bg-[#bf6fe5]/15 text-[#e9b3ff] text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full mt-3 border border-[#bf6fe5]/15">
-              {t.LEVEL}
-            </span>
           </div>
         ) : (
-          <form onSubmit={handleSaveProfile} className="space-y-4 animate-fadeIn">
+          <form onSubmit={handleSaveProfile} className="space-y-4 p-6 animate-fadeIn">
             <div className="flex justify-between items-center pb-2 border-b border-outline-variant/15">
               <h3 className="font-serif text-sm font-bold text-primary flex items-center gap-1.5">
                 <span className="material-symbols-outlined notranslate text-sm" translate="no">manage_accounts</span>
@@ -348,6 +436,195 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
                     >
                       {language === 'pt' ? 'Aplicar' : language === 'es' ? 'Aplicar' : 'Apply'}
                     </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* NEW Background Banner Customize Subpanel */}
+            <div className="bg-[#211a22] border border-outline-variant/15 rounded-xl p-4 space-y-3.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#e1bee7] border-b border-outline-variant/10 pb-2">
+                <span className="material-symbols-outlined text-base notranslate text-[#bf6fe5]" translate="no">image</span>
+                {BANNER_REG[language].SECTION_TITLE}
+              </div>
+
+              {/* Segmented Select Control */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-primary block">
+                  {BANNER_REG[language].TYPE_LABEL}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditBannerType('none');
+                    }}
+                    className={`px-2 py-2 rounded-xl text-[10px] font-bold transition-all border shrink-0 ${
+                      editBannerType === 'none'
+                        ? 'bg-primary text-on-primary border-primary shadow-sm'
+                        : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/10'
+                    }`}
+                  >
+                    {BANNER_REG[language].TYPE_NONE}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditBannerType('color');
+                      if (!editBannerValue || editBannerValue.startsWith('http') || editBannerValue.startsWith('data:')) {
+                        setEditBannerValue('#bf6fe5');
+                      }
+                    }}
+                    className={`px-2 py-2 rounded-xl text-[10px] font-bold transition-all border shrink-0 ${
+                      editBannerType === 'color'
+                        ? 'bg-primary text-on-primary border-primary shadow-sm'
+                        : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/10'
+                    }`}
+                  >
+                    {BANNER_REG[language].TYPE_COLOR}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditBannerType('image');
+                      if (!editBannerValue || (!editBannerValue.startsWith('http') && !editBannerValue.startsWith('data:'))) {
+                        setEditBannerValue(PRESET_BANNER_IMAGES[0].url);
+                      }
+                    }}
+                    className={`px-2 py-2 rounded-xl text-[10px] font-bold transition-all border shrink-0 ${
+                      editBannerType === 'image'
+                        ? 'bg-primary text-on-primary border-primary shadow-sm'
+                        : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/10'
+                    }`}
+                  >
+                    {BANNER_REG[language].TYPE_IMAGE}
+                  </button>
+                </div>
+              </div>
+
+              {/* Type Settings Editor Panels */}
+              {editBannerType === 'color' && (
+                <div className="space-y-3 pt-1 animate-fadeIn">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-on-surface-variant block">
+                      {BANNER_REG[language].SOLID_HEX_LABEL}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editBannerValue}
+                        onChange={(e) => setEditBannerValue(e.target.value)}
+                        placeholder="#bf6fe5"
+                        className="bg-surface-container border border-outline-variant/40 rounded-xl px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary flex-grow font-mono"
+                      />
+                      <div
+                        className="w-8 h-8 rounded-xl border border-outline-variant/50 self-center shrink-0 shadow-inner"
+                        style={{ backgroundColor: editBannerValue || '#000000' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] uppercase font-bold text-primary block">
+                      {BANNER_REG[language].PRESET_COLORS}:
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {PRESET_BANNER_COLORS.map((c, idx) => {
+                        const nameLocalized = language === 'pt' ? c.name : language === 'es' ? c.nameEs : c.nameEn;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setEditBannerValue(c.value)}
+                            className="w-7 h-7 rounded-full border border-white/10 relative cursor-pointer hover:scale-105 active:scale-95 transition-transform flex items-center justify-center shadow-sm"
+                            style={{ backgroundColor: c.value }}
+                            title={nameLocalized}
+                          >
+                            {editBannerValue === c.value && (
+                              <span className="material-symbols-outlined text-[13px] text-white font-bold notranslate" translate="no">check</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {editBannerType === 'image' && (
+                <div className="space-y-3 pt-1 animate-fadeIn">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-on-surface-variant block">
+                      {BANNER_REG[language].PHOTO_URL_LABEL}
+                    </label>
+                    <input
+                      type="text"
+                      value={(editBannerValue.startsWith('data:') || !editBannerValue.startsWith('http')) ? '' : editBannerValue}
+                      onChange={(e) => setEditBannerValue(e.target.value)}
+                      placeholder="https://images.unsplash.com/photo-..."
+                      className="w-full bg-surface-container border border-outline-variant/40 rounded-xl px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-on-surface-variant block">
+                      {BANNER_REG[language].PHOTO_UPLOAD_LABEL}
+                    </label>
+                    <label className="inline-flex items-center gap-1.5 bg-surface-container hover:bg-surface-container-high transition-colors text-[#e1bee7] border border-outline-variant/10 px-3.5 py-1.5 rounded-xl text-[10px] font-semibold cursor-pointer shadow-sm active:scale-95">
+                      <span className="material-symbols-outlined text-xs notranslate" translate="no">cloud_upload</span>
+                      {BANNER_REG[language].CHOOSE_FILE_LABEL}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (loadEvent) => {
+                              if (loadEvent.target?.result) {
+                                setEditBannerValue(loadEvent.target.result as string);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] uppercase font-bold text-primary block">
+                      {BANNER_REG[language].PRESET_PHOTOS}:
+                    </span>
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+                      {PRESET_BANNER_IMAGES.map((img, idx) => {
+                        const isSel = editBannerValue === img.url;
+                        const nameLocalized = language === 'pt' ? img.name : language === 'es' ? img.nameEs : img.nameEn;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setEditBannerValue(img.url)}
+                            className={`flex-shrink-0 relative w-16 h-10 rounded-lg overflow-hidden border transition-all ${
+                              isSel ? 'border-primary scale-[1.02] ring-1 ring-primary' : 'border-outline-variant/20 hover:border-primary/50'
+                            }`}
+                          >
+                            <img
+                              src={img.url}
+                              alt={nameLocalized}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute inset-0 bg-black/40 hover:bg-black/10 transition-colors flex items-center justify-center">
+                              <span className="text-[8px] text-white font-bold tracking-tight text-center px-0.5 truncate max-w-full drop-shadow-md">
+                                {nameLocalized}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

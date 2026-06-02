@@ -27,10 +27,23 @@ service cloud.firestore {
     // Validation for UserProfile
     function isValidUserProfile(data) {
       return data.keys().hasAll(['email', 'name', 'avatarUrl'])
-        && data.keys().size() == 3
+        && data.keys().size() >= 3 && data.keys().size() <= 6
         && data.email is string && data.email.size() <= 256
         && data.name is string && data.name.size() <= 128
         && data.avatarUrl is string && data.avatarUrl.size() <= 1500000; // Allow larger strings for base64 uploads
+    }
+
+    // Validation for global cached search books
+    function isValidBook(data) {
+      return data.keys().hasAll(['id', 'title', 'author', 'coverUrl', 'rating', 'snippet', 'tags', 'createdAt'])
+        && data.id is string && data.id.size() <= 256
+        && data.title is string && data.title.size() <= 500
+        && data.author is string && data.author.size() <= 500
+        && data.coverUrl is string && data.coverUrl.size() <= 1500000
+        && data.rating is number
+        && data.snippet is string && data.snippet.size() <= 100000
+        && data.tags is list && data.tags.size() <= 30
+        && data.createdAt is string && data.createdAt.size() <= 128;
     }
 
     // Validation for BookReview
@@ -85,6 +98,12 @@ service cloud.firestore {
       allow get: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(quoteId);
       allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(quoteId);
       allow create, update: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(quoteId) && isValidBookQuote(incoming());
+    }
+
+    // Match global books cache
+    match /books/{bookId} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidBook(incoming()) && isValidId(bookId);
     }
 
     // Match visits tracking collection for site access analytics

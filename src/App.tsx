@@ -94,7 +94,9 @@ export default function App() {
               name: data.name || firebaseUser.displayName || 'Leitor Apaixonado',
               avatarUrl: data.avatarUrl || firebaseUser.photoURL || 'https://picsum.photos/seed/bookshelfavatar/150/150',
               uid: firebaseUser.uid,
-              language: profileLanguage
+              language: profileLanguage,
+              bannerType: data.bannerType || 'none',
+              bannerValue: data.bannerValue || ''
             };
             setUser(profile);
             localStorage.setItem('bookshelf_user', JSON.stringify(profile));
@@ -108,9 +110,11 @@ export default function App() {
               const email = prev?.uid === userId ? prev.email : (firebaseUser.email || 'usuario@bookshelf.com');
               const name = prev?.uid === userId ? prev.name : (firebaseUser.displayName || 'Leitor Apaixonado');
               const avatarUrl = prev?.uid === userId ? prev.avatarUrl : (firebaseUser.photoURL || 'https://picsum.photos/seed/bookshelfavatar/150/150');
-              const profile = { email, name, avatarUrl, uid: userId, language: language };
+              const bannerType = prev?.uid === userId ? (prev.bannerType || 'none') : 'none';
+              const bannerValue = prev?.uid === userId ? (prev.bannerValue || '') : '';
+              const profile: UserProfile = { email, name, avatarUrl, uid: userId, language: language, bannerType, bannerValue };
               
-              setDoc(cloudProfileRef, { email, name, avatarUrl, language }).catch(err => {
+              setDoc(cloudProfileRef, { email, name, avatarUrl, language, bannerType, bannerValue }).catch(err => {
                 console.error("Erro ao salvar cadastro inicial no Firestore:", err);
               });
               
@@ -167,7 +171,9 @@ export default function App() {
             if (
               prev.name !== cloudProfile.name ||
               prev.avatarUrl !== cloudProfile.avatarUrl ||
-              prev.language !== cloudProfile.language
+              prev.language !== cloudProfile.language ||
+              prev.bannerType !== cloudProfile.bannerType ||
+              prev.bannerValue !== cloudProfile.bannerValue
             ) {
               const merged = { ...prev, ...cloudProfile };
               localStorage.setItem('bookshelf_user', JSON.stringify(merged));
@@ -185,7 +191,9 @@ export default function App() {
             email: user.email,
             name: user.name,
             avatarUrl: user.avatarUrl,
-            language: language
+            language: language,
+            bannerType: user.bannerType || 'none',
+            bannerValue: user.bannerValue || ''
           });
         }
       } catch (err) {
@@ -399,7 +407,12 @@ export default function App() {
       const updated = [newReview, ...reviews];
       setReviews(updated);
       localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
-      showToast(t.TOAST_RECOMMENDED_ADDED);
+      
+      // Automatically pop open the review writer form so they can write their custom resenha!
+      setEditingReview(newReview);
+      setIsFormOpen(true);
+      
+      showToast(language === 'pt' ? 'Livro adicionado! Escreva sua resenha ou configure os detalhes abaixo.' : language === 'es' ? '¡Libro agregado! Escribe tu reseña o edita los detalles del libro.' : 'Book added! Write your review or edit book parameters below.');
     } catch (error) {
       showToast(t.TOAST_UPDATE_ERROR, true);
       handleFirestoreError(error, OperationType.WRITE, path);
@@ -679,7 +692,9 @@ export default function App() {
                             email: updatedUser.email,
                             name: updatedUser.name,
                             avatarUrl: updatedUser.avatarUrl,
-                            language: updatedUser.language || language
+                            language: updatedUser.language || language,
+                            bannerType: updatedUser.bannerType || 'none',
+                            bannerValue: updatedUser.bannerValue || ''
                           });
                         } catch (err) {
                           console.error("Falha ao sincronizar perfil com o Firestore:", err);

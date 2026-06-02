@@ -2,14 +2,35 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "User profile with avatar and custom username",
+      "description": "User profile with avatar, custom username, banner customized fields",
       "type": "object",
       "properties": {
         "email": { "type": "string", "description": "Email address of the owner" },
         "name": { "type": "string", "description": "Display name or nickname" },
-        "avatarUrl": { "type": "string", "description": "Web URL to user avatar photo" }
+        "avatarUrl": { "type": "string", "description": "Web URL to user avatar photo" },
+        "language": { "type": "string", "description": "User preferred interface language" },
+        "bannerType": { "type": "string", "description": "Banner type option none/color/image" },
+        "bannerValue": { "type": "string", "description": "Hex code or Image URL value" }
       },
       "required": ["email", "name", "avatarUrl"]
+    },
+    "Book": {
+      "title": "Book",
+      "description": "Information parsed from web lookup and cached",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique ID or self link generated for search" },
+        "title": { "type": "string", "description": "The title of the book" },
+        "author": { "type": "string", "description": "The author of the book" },
+        "coverUrl": { "type": "string", "description": "Cover asset URL" },
+        "rating": { "type": "number", "description": "Average ratings score" },
+        "snippet": { "type": "string", "description": "Synopses description text" },
+        "tags": { "type": "array", "description": "Parsed genre keys" },
+        "buyLink": { "type": "string", "description": "Purchase link if parsed" },
+        "buyLinkText": { "type": "string", "description": "Label text for buy link" },
+        "createdAt": { "type": "string", "description": "Creation timestamp placeholder" }
+      },
+      "required": ["id", "title", "author", "coverUrl", "rating", "snippet", "tags", "createdAt"]
     },
     "BookReview": {
       "title": "BookReview",
@@ -76,6 +97,10 @@
     "/users/{userId}/quotes/{quoteId}": {
       "schema": "BookQuote",
       "description": "Storage for each user's notes and quotes"
+    },
+    "/books/{bookId}": {
+      "schema": "Book",
+      "description": "Information stored on search grounding"
     }
   }
 }

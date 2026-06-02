@@ -13,6 +13,8 @@ export interface TranslationSet {
   WELCOME_BACK: string;
   LOGIN_SUBTITLE: string;
   LOGIN_WITH_GOOGLE: string;
+  LOGIN_WITH_APPLE: string;
+  LOGIN_WITH_OUTLOOK: string;
   OR_USE_NAME: string;
   CREATE_CUSTOM_SHELF: string;
   YOUR_NAME: string;
@@ -135,6 +137,8 @@ export const TRANSLATIONS: Record<Language, TranslationSet> = {
     WELCOME_BACK: 'Bem-vindo de volta',
     LOGIN_SUBTITLE: 'Conecte-se para acessar sua estante digital de resenhas e anotações.',
     LOGIN_WITH_GOOGLE: 'Entrar com o Google',
+    LOGIN_WITH_APPLE: 'Entrar com a Apple',
+    LOGIN_WITH_OUTLOOK: 'Entrar com o Outlook',
     OR_USE_NAME: 'ou use nome',
     CREATE_CUSTOM_SHELF: 'Criar Estante Personalizada',
     YOUR_NAME: 'Seu Nome / Apelido',
@@ -246,6 +250,8 @@ export const TRANSLATIONS: Record<Language, TranslationSet> = {
     WELCOME_BACK: 'Welcome back',
     LOGIN_SUBTITLE: 'Sign in to access your digital bookshelf of reviews and annotations.',
     LOGIN_WITH_GOOGLE: 'Sign in with Google',
+    LOGIN_WITH_APPLE: 'Sign in with Apple',
+    LOGIN_WITH_OUTLOOK: 'Sign in with Outlook',
     OR_USE_NAME: 'or enter your name',
     CREATE_CUSTOM_SHELF: 'Create Custom Bookshelf',
     YOUR_NAME: 'Your Name / Pen Name',
@@ -357,6 +363,8 @@ export const TRANSLATIONS: Record<Language, TranslationSet> = {
     WELCOME_BACK: 'Bienvenido de nuevo',
     LOGIN_SUBTITLE: 'Inicia sesión para acceder a tu estantería digital de reseñas y notas.',
     LOGIN_WITH_GOOGLE: 'Entrar con Google',
+    LOGIN_WITH_APPLE: 'Iniciar sesión con Apple',
+    LOGIN_WITH_OUTLOOK: 'Iniciar sesión con Outlook',
     OR_USE_NAME: 'o ingresa tu nombre',
     CREATE_CUSTOM_SHELF: 'Crear Estantería Personalizada',
     YOUR_NAME: 'Tu Nombre / Alias',

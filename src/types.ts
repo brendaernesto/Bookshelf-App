@@ -20,4 +20,6 @@ export interface UserProfile {
   avatarUrl: string;
   uid?: string;
   language?: 'pt' | 'en' | 'es';
+  bannerType?: 'none' | 'color' | 'image';
+  bannerValue?: string;
 }
