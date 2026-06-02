@@ -86,5 +86,10 @@ service cloud.firestore {
       allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(quoteId);
       allow create, update: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(quoteId) && isValidBookQuote(incoming());
     }
+
+    // Match visits tracking collection for site access analytics
+    match /visits/{dateStr} {
+      allow get, list, create, update: if true;
+    }
   }
 }

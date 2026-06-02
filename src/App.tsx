@@ -11,7 +11,7 @@ import WritingView from './components/WritingView';
 import ProfileView from './components/ProfileView';
 
 // Firebase Firestore and Auth imports
-import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth, signOut, handleFirestoreError, OperationType } from './firebase';
 
@@ -35,6 +35,27 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; isError?: boolean } | null>(null);
 
   const t = TRANSLATIONS[language];
+
+  // Record daily visitor accesses to Firebase Firestore database
+  useEffect(() => {
+    const recordPageVisit = async () => {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const sessionKey = `bookshelf_visit_${todayStr}`;
+        if (!sessionStorage.getItem(sessionKey)) {
+          const visitRef = doc(db, 'visits', todayStr);
+          await setDoc(visitRef, {
+            count: increment(1),
+            date: todayStr
+          }, { merge: true });
+          sessionStorage.setItem(sessionKey, 'true');
+        }
+      } catch (err) {
+        console.warn("Could not record daily visit stats:", err);
+      }
+    };
+    recordPageVisit();
+  }, []);
 
   const showToast = (message: string, isError = false) => {
     setToast({ message, isError });

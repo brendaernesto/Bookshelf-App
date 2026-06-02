@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile, BookReview } from '../types';
 import { TRANSLATIONS, Language } from '../translations';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface ProfileViewProps {
   profile: UserProfile;
@@ -42,6 +44,69 @@ const PRESET_AVATARS = [
 ];
 
 export default function ProfileView({ profile, reviews, onLogout, onUpdateProfile, language }: ProfileViewProps) {
+  const isAdmin = profile.email?.toLowerCase() === 'brendaernesto27@gmail.com';
+  const [visitStats, setVisitStats] = useState<{ date: string; count: number }[]>([]);
+  const [loadingVisits, setLoadingVisits] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const fetchVisits = async () => {
+      setLoadingVisits(true);
+      setStatsError(null);
+      try {
+        const visitsSnap = await getDocs(collection(db, 'visits'));
+        const list: { date: string; count: number }[] = [];
+        visitsSnap.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            date: docSnap.id,
+            count: typeof data.count === 'number' ? data.count : 0
+          });
+        });
+        // Sort by date descending
+        list.sort((a, b) => b.date.localeCompare(a.date));
+        setVisitStats(list);
+      } catch (err) {
+        console.error("Error loading visits:", err);
+        setStatsError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoadingVisits(false);
+      }
+    };
+
+    fetchVisits();
+  }, [isAdmin]);
+
+  const handleSendReportEmail = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const subject = encodeURIComponent(`📊 Relatório Diário de Acessos - Bookshelf (${todayStr})`);
+    
+    let reportBody = `Olá Brenda!\n\n`;
+    reportBody += `Aqui está o relatório consolidado de acessos diários do seu aplicativo Bookshelf.\n\n`;
+    reportBody += `Histórico de Acessos Recentes:\n`;
+    reportBody += `--------------------------------------------------\n`;
+    
+    if (visitStats.length === 0) {
+      reportBody += `Nenhum acesso registrado ainda ou carregando dados...\n`;
+    } else {
+      visitStats.slice(0, 15).forEach(stat => {
+        const [yr, mo, dy] = stat.date.split('-');
+        const formattedDate = yr && mo && dy ? `${dy}/${mo}/${yr}` : stat.date;
+        reportBody += `📅 Data: ${formattedDate} | 👥 Acessos Únicos: ${stat.count}\n`;
+      });
+    }
+    
+    reportBody += `--------------------------------------------------\n`;
+    reportBody += `Total acumulado monitorado: ${visitStats.reduce((acc, curr) => acc + curr.count, 0)} acessos.\n\n`;
+    reportBody += `O Bookshelf agora está disponível globalmente em qualquer navegador ao redor do mundo!\n\n`;
+    reportBody += `Atenciosamente,\nSeu Assistente de IA Bookshelf 💜`;
+    
+    const body = encodeURIComponent(reportBody);
+    window.location.href = `mailto:brendaernesto27@gmail.com?subject=${subject}&body=${body}`;
+  };
+
   const [goal, setGoal] = useState(() => {
     const saved = localStorage.getItem('bookshelf_goal');
     return saved ? parseInt(saved) : 12;
@@ -471,6 +536,84 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
           </div>
         </div>
       </section>
+
+      {/* EXCLUSIVE OWNER ADMIN VISIT METRICS PANEL */}
+      {isAdmin && (
+        <section className="bg-surface-container-low border border-[#bf6fe5]/40 p-6 rounded-2xl space-y-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined notranslate text-[#bf6fe5] text-2xl animate-pulse" translate="no">monitoring</span>
+              <div>
+                <h4 className="text-sm font-bold text-[#ebdfea] tracking-wide uppercase">
+                  {language === 'pt' ? 'Painel de Administração' : language === 'es' ? 'Panel de Administración' : 'Admin Panel'}
+                </h4>
+                <p className="text-[10px] text-on-surface-variant font-mono">
+                  {language === 'pt' ? 'Exclusivo para Brenda Ernesto' : language === 'es' ? 'Exclusivo para Brenda Ernesto' : 'Exclusive for Brenda Ernesto'}
+                </p>
+              </div>
+            </div>
+            
+            <button
+              onClick={handleSendReportEmail}
+              disabled={loadingVisits || visitStats.length === 0}
+              className="bg-[#bf6fe5] hover:bg-[#a14ac9] disabled:bg-[#bf6fe5]/20 disabled:text-on-surface-variant/40 text-white font-bold text-[10px] uppercase tracking-wider px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer border-0"
+              title={language === 'pt' ? 'Enviar relatório de acessos por e-mail' : language === 'es' ? 'Enviar informe de accesos por e-mail' : 'Send access report via e-mail'}
+            >
+              <span className="material-symbols-outlined notranslate text-[13px]" translate="no">mail</span>
+              {language === 'pt' ? 'Enviar Relatório' : language === 'es' ? 'Enviar Informe' : 'Send Report'}
+            </button>
+          </div>
+
+          <p className="text-[11px] text-on-surface-variant leading-relaxed">
+            {language === 'pt' 
+              ? 'Todos os acessos são registrados no banco de dados e consolidados abaixo. Você pode enviar o relatório diário para o seu e-mail pessoal com o botão acima a qualquer momento.' 
+              : language === 'es' 
+              ? 'Todos los accesos se registran en la base de datos y se consolidan a continuación. Puede enviar el informe diario a su correo electrónico personal con el botón superior en cualquier momento.' 
+              : 'All page loads are registered in the database and consolidated below. You can send the daily digest report to your personal inbox anytime.'
+            }
+          </p>
+
+          {loadingVisits ? (
+            <div className="py-6 flex flex-col items-center justify-center gap-2">
+              <div className="w-5 h-5 border-2 border-[#bf6fe5] border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-[10px] text-on-surface-variant animate-pulse">
+                {language === 'pt' ? 'Carregando estatísticas...' : language === 'es' ? 'Cargando estadísticas...' : 'Loading statistics...'}
+              </p>
+            </div>
+          ) : statsError ? (
+            <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-[11px] text-red-300">
+              {language === 'pt' ? 'Erro ao carregar do Firestore:' : language === 'es' ? 'Error al cargar de Firestore:' : 'Error loading from Firestore:'} {statsError}
+            </div>
+          ) : visitStats.length === 0 ? (
+            <div className="bg-surface-container-lowest p-4 rounded-xl text-center text-[11px] text-on-surface-variant italic">
+              {language === 'pt' ? 'Nenhum acesso registrado até o momento.' : language === 'es' ? 'No hay accesos registrados todavía.' : 'No accesses recorded yet.'}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 bg-[#171219] px-3 py-1.5 rounded-t-xl text-[9px] uppercase tracking-wider font-extrabold text-primary pl-4">
+                <span>{language === 'pt' ? 'Data' : language === 'es' ? 'Fecha' : 'Date'}</span>
+                <span className="text-right pr-4">{language === 'pt' ? 'Acessos Exclusivos' : language === 'es' ? 'Accesos Únicos' : 'Unique Accesses'}</span>
+              </div>
+              <div className="max-h-[220px] overflow-y-auto divide-y divide-[#171219]/20 rounded-b-xl border border-[#171219]/10 bg-surface-container-lowest scrollbar-thin">
+                {visitStats.map((stat, idx) => {
+                  const [yr, mo, dy] = stat.date.split('-');
+                  const displayDate = yr && mo && dy ? `${dy}/${mo}/${yr}` : stat.date;
+                  return (
+                    <div key={idx} className="grid grid-cols-2 px-4 py-2.5 text-xs font-mono items-center hover:bg-surface-container/20 transition-colors">
+                      <span className="text-on-surface font-semibold">{displayDate}</span>
+                      <span className="text-right text-[#bf6fe5] font-bold pr-4">{stat.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between items-center bg-surface-container-high/35 px-4 py-2 rounded-xl text-[10px] font-mono text-on-surface-variant border border-outline-variant/10 mt-1">
+                <span>Total Consolidado:</span>
+                <span className="font-bold text-[#bf6fe5]">{visitStats.reduce((acc, curr) => acc + curr.count, 0)} acessos</span>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Logout Row */}
       <button
