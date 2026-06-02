@@ -630,7 +630,7 @@ export default function App() {
                   /* ========================================================
                      WRITING TAB (Draft workspace, notes, quote log book)
                      ======================================================== */
-                  <WritingView language={language} />
+                  <WritingView language={language} user={user} />
                 )}
 
                 {currentTab === 'PROFILE' && (

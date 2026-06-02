@@ -51,6 +51,20 @@ service cloud.firestore {
         && data.userId == request.auth.uid;
     }
 
+    // Validation for BookQuote
+    function isValidBookQuote(data) {
+      return data.keys().hasAll(['id', 'bookTitle', 'quoteText', 'savedAt', 'userId'])
+        && data.keys().size() >= 5 && data.keys().size() <= 7
+        && data.id is string && data.id.size() <= 128
+        && data.bookTitle is string && data.bookTitle.size() <= 500
+        && data.quoteText is string && data.quoteText.size() <= 100000
+        && (!data.keys().contains('page') || (data.page is string && data.page.size() <= 64))
+        && (!data.keys().contains('chapter') || (data.chapter is string && data.chapter.size() <= 128))
+        && data.savedAt is string && data.savedAt.size() <= 128
+        && data.userId is string && data.userId.size() <= 128
+        && data.userId == request.auth.uid;
+    }
+
     // Match users
     match /users/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
@@ -63,6 +77,14 @@ service cloud.firestore {
       allow get: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(reviewId);
       allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(reviewId);
       allow create, update: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(reviewId) && isValidBookReview(incoming());
+    }
+
+    // Match nested quotes collection
+    match /users/{userId}/quotes/{quoteId} {
+      allow list: if isSignedIn() && request.auth.uid == userId;
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(quoteId);
+      allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(quoteId);
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(quoteId) && isValidBookQuote(incoming());
     }
   }
 }

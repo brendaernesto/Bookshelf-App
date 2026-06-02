@@ -41,6 +41,27 @@
         "createdAt",
         "userId"
       ]
+    },
+    "BookQuote": {
+      "title": "BookQuote",
+      "description": "User notes or quotes written down synchronously",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique key or Firestore document ID" },
+        "bookTitle": { "type": "string", "description": "The title of the reference book" },
+        "quoteText": { "type": "string", "description": "The text content of the quote/note" },
+        "page": { "type": "string", "description": "The optional page number" },
+        "chapter": { "type": "string", "description": "The optional chapter name/number" },
+        "savedAt": { "type": "string", "format": "date-time", "description": "Quote registration timestamp" },
+        "userId": { "type": "string", "description": "The Firestore UID of the owner" }
+      },
+      "required": [
+        "id",
+        "bookTitle",
+        "quoteText",
+        "savedAt",
+        "userId"
+      ]
     }
   },
   "firestore": {
@@ -51,6 +72,10 @@
     "/users/{userId}/reviews/{reviewId}": {
       "schema": "BookReview",
       "description": "Underlying storage for each user's book review documents"
+    },
+    "/users/{userId}/quotes/{quoteId}": {
+      "schema": "BookQuote",
+      "description": "Storage for each user's notes and quotes"
     }
   }
 }
