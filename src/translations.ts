@@ -113,6 +113,10 @@ export interface TranslationSet {
   LOGOUT_CONFIRM: string;
   NAME_EMPTY_ALERT: string;
   SELECT_LANGUAGE: string;
+  SELECT_THEME: string;
+  THEME_LIGHT: string;
+  THEME_DARK: string;
+  THEME_DESCRIPTION: string;
 
   // Additional Helper Labels
   UNKNOWN_AUTHOR: string;
@@ -229,6 +233,10 @@ export const TRANSLATIONS: Record<Language, TranslationSet> = {
     LOGOUT_CONFIRM: 'Confirmar: Deseja realmente sair?',
     NAME_EMPTY_ALERT: 'O nome do usuário não pode ficar em branco.',
     SELECT_LANGUAGE: 'Idioma do Aplicativo',
+    SELECT_THEME: 'Tema do Aplicativo',
+    THEME_LIGHT: 'Tema Claro (Lilás & Violeta)',
+    THEME_DARK: 'Tema Escuro (Espacial)',
+    THEME_DESCRIPTION: 'Selecione entre o tema espacial padrão ou o novo tema lilás e violeta escuro.',
 
     UNKNOWN_AUTHOR: 'Autor Desconhecido',
     NO_REVIEW_TEXT: 'Nenhuma resenha inserida ainda. Toque em Editar para escrever uma.',
@@ -342,6 +350,10 @@ export const TRANSLATIONS: Record<Language, TranslationSet> = {
     LOGOUT_CONFIRM: 'Confirm: Are you sure you want to sign out?',
     NAME_EMPTY_ALERT: 'UserName cannot be left blank.',
     SELECT_LANGUAGE: 'App Language',
+    SELECT_THEME: 'App Theme',
+    THEME_LIGHT: 'Light Theme (Lilac & Violet)',
+    THEME_DARK: 'Dark Theme (Cosmic)',
+    THEME_DESCRIPTION: 'Choose between the default cosmic dark theme or the new soft lilac & dark violet theme.',
 
     UNKNOWN_AUTHOR: 'Unknown Author',
     NO_REVIEW_TEXT: 'No review text has been added yet. Tap Edit to start writing.',
@@ -455,6 +467,10 @@ export const TRANSLATIONS: Record<Language, TranslationSet> = {
     LOGOUT_CONFIRM: 'Confirmar: ¿Deseas realmente salir?',
     NAME_EMPTY_ALERT: 'El nombre de usuario no puede quedar vacío.',
     SELECT_LANGUAGE: 'Idioma del Aplicativo',
+    SELECT_THEME: 'Tema de la Aplicación',
+    THEME_LIGHT: 'Tema Claro (Lila y Violeta)',
+    THEME_DARK: 'Tema Oscuro (Espacial)',
+    THEME_DESCRIPTION: 'Selecciona entre el tema espacial por defecto o el nuevo tema lila y violeta oscuro.',
 
     UNKNOWN_AUTHOR: 'Autor Desconocido',
     NO_REVIEW_TEXT: 'Aun no hay reseña redactada. Toca Editar para empezar a escribir.',

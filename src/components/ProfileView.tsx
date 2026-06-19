@@ -257,27 +257,31 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
     <div className="w-full max-w-2xl mx-auto pb-32 space-y-6 animate-in fade-in duration-300">
       
       {/* Profile Header card & Editor block */}
-      <section className="bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden">
+      <section className="bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-lg transition-all duration-300">
         {!isEditing ? (
-          <div>
-            {/* Optional Background Banner */}
+          <div className="relative min-h-[220px] flex flex-col justify-center overflow-hidden">
+            {/* Background Banner covering the ENTIRE block */}
             {profile.bannerType && profile.bannerType !== 'none' ? (
-              <div className="h-32 w-full relative">
+              <div className="absolute inset-0 w-full h-full z-0 select-none pointer-events-none">
                 {profile.bannerType === 'color' ? (
-                  <div className="w-full h-full text-white font-serif flex items-center justify-center font-bold text-xs" style={{ backgroundColor: profile.bannerValue || '#231e25' }}></div>
+                  <div className="w-full h-full transition-colors duration-500" style={{ backgroundColor: profile.bannerValue || '#231e25' }}></div>
                 ) : (
                   <img
                     src={profile.bannerValue || 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?q=80&w=600&auto=format&fit=crop'}
                     alt="Banner"
-                    className="w-full h-full object-cover animate-fadeIn"
+                    className="w-full h-full object-cover animate-fadeIn transition-all duration-500"
                     referrerPolicy="no-referrer"
                   />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-surface-container-low/90 via-transparent to-black/15"></div>
+                {/* Modern layout gradient shade to guarantee incredible contrast on text and elements */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/45 to-surface"></div>
               </div>
-            ) : null}
+            ) : (
+              /* Soft default ambiance pattern if "none" is chosen */
+              <div className="absolute inset-0 w-full h-full z-0 select-none pointer-events-none bg-gradient-to-br from-[#bf6fe5]/5 via-transparent to-[#bf6fe5]/10"></div>
+            )}
 
-            <div className={`flex flex-col items-center text-center relative ${profile.bannerType && profile.bannerType !== 'none' ? 'p-6 pt-0' : 'p-6'}`}>
+            <div className="flex flex-col items-center text-center relative p-8 z-10 w-full">
               <button
                 onClick={() => {
                   setEditName(profile.name);
@@ -286,14 +290,14 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
                   setEditBannerValue(profile.bannerValue || '');
                   setIsEditing(true);
                 }}
-                className="absolute top-4 right-4 bg-primary/10 backdrop-blur-md hover:bg-primary/25 text-primary text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 z-20"
+                className="absolute top-4 right-4 bg-black/40 backdrop-blur-md hover:bg-black/65 text-white text-[11px] font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 z-25 border border-white/10"
                 title={t.EDIT_PROFILE}
               >
                 <span className="material-symbols-outlined notranslate text-[13px]" translate="no">edit</span>
                 {t.EDIT_PROFILE}
               </button>
 
-              <div className={`${profile.bannerType && profile.bannerType !== 'none' ? '-mt-12 border-4 border-surface-container-low shadow-xl' : 'border-2 border-[#bf6fe5] shadow-md'} z-10 w-20 h-20 rounded-full bg-[#1e1124] overflow-hidden flex items-center justify-center transition-all`}>
+              <div className="border-4 border-[#bf6fe5]/40 shadow-xl z-10 w-24 h-24 rounded-full bg-surface-container overflow-hidden flex items-center justify-center transition-all hover:scale-105 duration-300">
                 <img
                   src={profile.avatarUrl}
                   alt={profile.name}
@@ -301,10 +305,10 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
                   className="w-full h-full object-cover"
                 />
               </div>
-              <h2 className="font-serif text-lg font-bold text-on-surface mt-3">{profile.name}</h2>
-              <p className="text-xs text-on-surface-variant font-mono">{profile.email}</p>
+              <h2 className="font-serif text-xl font-bold text-on-surface mt-4 drop-shadow-sm">{profile.name}</h2>
+              <p className="text-xs text-on-surface-variant font-mono mt-1 drop-shadow-xs">{profile.email}</p>
 
-              <span className="bg-[#bf6fe5]/15 text-[#e9b3ff] text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full mt-3 border border-[#bf6fe5]/15">
+              <span className="bg-[#bf6fe5]/30 text-[#f5dbff] text-[10px] uppercase font-bold tracking-widest px-4 py-1.5 rounded-full mt-4 border border-[#bf6fe5]/40 hover:bg-[#bf6fe5]/40 transition-colors cursor-default shadow-sm backdrop-blur-sm">
                 {t.LEVEL}
               </span>
             </div>
@@ -668,6 +672,44 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
             </div>
           </form>
         )}
+      </section>
+
+      {/* NEW Interactive App Theme Selection Section */}
+      <section className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/20 space-y-3.5">
+        <h3 className="text-xs font-bold uppercase tracking-widest text-[#dfb9ed] flex items-center gap-1.5 ml-0.5">
+          <span className="material-symbols-outlined notranslate text-sm" translate="no">palette</span>
+          {t.SELECT_THEME}
+        </h3>
+        <p className="text-[11px] text-on-surface-variant italic -mt-1 pl-1">
+          {t.THEME_DESCRIPTION}
+        </p>
+        <div className="grid grid-cols-2 gap-2.5">
+          {(['dark', 'light'] as const).map((thm) => {
+            const isSel = (profile?.theme || 'dark') === thm;
+            return (
+              <button
+                key={thm}
+                onClick={async () => {
+                  if (profile) {
+                    await onUpdateProfile({ ...profile, theme: thm });
+                  }
+                }}
+                className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all duration-300 flex items-center gap-2 justify-center active:scale-95 cursor-pointer ${
+                  isSel
+                    ? 'bg-primary/20 hover:bg-primary/30 text-white border-[#bf6fe5] shadow-sm scale-[1.01]'
+                    : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-white border-outline-variant/15'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base notranslate animate-fadeIn" translate="no">
+                  {thm === 'dark' ? 'dark_mode' : 'light_mode'}
+                </span>
+                <span className="text-[10px] uppercase tracking-wider">
+                  {thm === 'dark' ? t.THEME_DARK : t.THEME_LIGHT}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       {/* NEW Interactive App Language Selection Section */}

@@ -22,4 +22,5 @@ export interface UserProfile {
   language?: 'pt' | 'en' | 'es';
   bannerType?: 'none' | 'color' | 'image';
   bannerValue?: string;
+  theme?: 'dark' | 'light';
 }

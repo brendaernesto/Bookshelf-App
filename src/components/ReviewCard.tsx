@@ -196,7 +196,7 @@ export default function ReviewCard({
               className={`text-[10px] font-bold px-3 py-1 rounded transition-all active:scale-95 cursor-pointer ${
                 review.status === st
                   ? 'bg-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed'
-                  : 'bg-[#171219] hover:bg-primary/20 text-[#e9b3ff] hover:text-white border border-[#e9b3ff]/20'
+                  : 'bg-surface hover:bg-primary/20 text-primary hover:text-white border border-primary/20'
               }`}
             >
               {st === 'LENDO' ? t.STATUS_LENDO : st === 'CONCLUÍDO' ? t.STATUS_CONCLUIDO : t.STATUS_PAUSADO}
@@ -232,7 +232,7 @@ export default function ReviewCard({
                 onDelete(review.id);
                 setShowDeleteConfirm(false);
               }}
-              className="text-xs bg-error hover:bg-opacity-95 text-[#171219] px-3 py-1.5 rounded-lg transition-all font-bold cursor-pointer active:scale-95 focus:outline-none"
+              className="text-xs bg-error hover:bg-opacity-95 text-surface px-3 py-1.5 rounded-lg transition-all font-bold cursor-pointer active:scale-95 focus:outline-none"
             >
               {t.YES_DELETE}
             </button>
@@ -241,7 +241,7 @@ export default function ReviewCard({
       )}
 
       {/* Action Bar */}
-      <div className="border-t border-outline-variant/20 flex divide-x divide-outline-variant/20 bg-[#171219]/30">
+      <div className="border-t border-outline-variant/20 flex divide-x divide-outline-variant/20 bg-surface/30">
         <button
           onClick={() => {
             onEdit(review);

@@ -25,6 +25,22 @@ export default function App() {
     }
     return 'pt';
   });
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const savedTheme = localStorage.getItem('bookshelf_theme') as 'dark' | 'light';
+    if (savedTheme && ['dark', 'light'].includes(savedTheme)) {
+      return savedTheme;
+    }
+    const savedUser = localStorage.getItem('bookshelf_user');
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed.theme && ['dark', 'light'].includes(parsed.theme)) {
+          return parsed.theme;
+        }
+      } catch (e) {}
+    }
+    return 'dark';
+  });
   const [currentTab, setCurrentTab] = useState<'LIBRARY' | 'EXPLORE' | 'WRITING' | 'PROFILE'>('LIBRARY');
   const [selectedFilter, setSelectedFilter] = useState<'TUDO' | 'LENDO' | 'CONCLUÍDO' | 'FAVORITOS'>('TUDO');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +83,16 @@ export default function App() {
     document.documentElement.lang = language === 'pt' ? 'pt-BR' : language === 'es' ? 'es-ES' : 'en-US';
   }, [language]);
 
+  // Synchronize dynamic theme (light vs dark mode)
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.remove('light');
+    }
+    localStorage.setItem('bookshelf_theme', theme);
+  }, [theme]);
+
   // Load user info from localStorage on mount & subscribe to real Firebase Auth changes
   useEffect(() => {
     // 1. Recover instantly from localStorage for responsive paint
@@ -89,6 +115,7 @@ export default function App() {
           if (profileSnap.exists()) {
             const data = profileSnap.data();
             const profileLanguage = data.language || language;
+            const profileTheme = data.theme || theme;
             const profile: UserProfile = {
               email: firebaseUser.email || data.email || 'usuario@bookshelf.com',
               name: data.name || firebaseUser.displayName || 'Leitor Apaixonado',
@@ -96,13 +123,18 @@ export default function App() {
               uid: firebaseUser.uid,
               language: profileLanguage,
               bannerType: data.bannerType || 'none',
-              bannerValue: data.bannerValue || ''
+              bannerValue: data.bannerValue || '',
+              theme: profileTheme
             };
             setUser(profile);
             localStorage.setItem('bookshelf_user', JSON.stringify(profile));
             if (data.language) {
               setLanguage(data.language);
               localStorage.setItem('bookshelf_language', data.language);
+            }
+            if (data.theme) {
+              setTheme(data.theme);
+              localStorage.setItem('bookshelf_theme', data.theme);
             }
           } else {
             // Only sync from state or firebaseUser to prevent overwriting
@@ -112,9 +144,9 @@ export default function App() {
               const avatarUrl = prev?.uid === userId ? prev.avatarUrl : (firebaseUser.photoURL || 'https://picsum.photos/seed/bookshelfavatar/150/150');
               const bannerType = prev?.uid === userId ? (prev.bannerType || 'none') : 'none';
               const bannerValue = prev?.uid === userId ? (prev.bannerValue || '') : '';
-              const profile: UserProfile = { email, name, avatarUrl, uid: userId, language: language, bannerType, bannerValue };
+              const profile: UserProfile = { email, name, avatarUrl, uid: userId, language: language, bannerType, bannerValue, theme };
               
-              setDoc(cloudProfileRef, { email, name, avatarUrl, language, bannerType, bannerValue }).catch(err => {
+              setDoc(cloudProfileRef, { email, name, avatarUrl, language, bannerType, bannerValue, theme }).catch(err => {
                 console.error("Erro ao salvar cadastro inicial no Firestore:", err);
               });
               
@@ -140,9 +172,6 @@ export default function App() {
       } else {
         // No authenticated session is active: clear active user context
         setUser(null);
-        // Clean local identifiers for the session but leave the main translations in place
-        localStorage.removeItem('bookshelf_user');
-        localStorage.removeItem('bookshelf_reviews');
       }
     });
 
@@ -214,17 +243,9 @@ export default function App() {
           setReviews(list);
           localStorage.setItem('bookshelf_reviews', JSON.stringify(list));
         } else {
-          // If Firestore is empty, seed it with initial reviews data
-          console.log("Seeding Firestore with elegant defaults template for user profile:", userId);
-          const listWithUserId = INITIAL_REVIEWS.map(r => ({ ...r, userId }));
-          
-          for (const rev of listWithUserId) {
-            const reviewDocRef = doc(db, reviewsPath, rev.id);
-            await setDoc(reviewDocRef, rev);
-          }
-          
-          setReviews(listWithUserId);
-          localStorage.setItem('bookshelf_reviews', JSON.stringify(listWithUserId));
+          // If Firestore is empty, keep library empty so users can add manually
+          setReviews([]);
+          localStorage.setItem('bookshelf_reviews', JSON.stringify([]));
         }
       } catch (error) {
         console.warn("Could not fetch cloud data, loading local cache:", error);
@@ -234,10 +255,10 @@ export default function App() {
             setReviews(JSON.parse(savedReviews));
           } catch (e) {
             console.error(e);
-            setReviews(INITIAL_REVIEWS);
+            setReviews([]);
           }
         } else {
-          setReviews(INITIAL_REVIEWS);
+          setReviews([]);
         }
       }
     };
@@ -452,7 +473,7 @@ export default function App() {
   }
 
   return (
-    <div className="bg-[#171219] text-[#ebdfea] min-h-screen pb-28 relative animate-fadeIn">
+    <div className="bg-surface text-on-surface min-h-screen pb-28 relative animate-fadeIn">
       {/* Real-time Toast Notifications */}
       {toast && (
         <div
@@ -683,6 +704,10 @@ export default function App() {
                         setLanguage(updatedUser.language);
                         localStorage.setItem('bookshelf_language', updatedUser.language);
                       }
+                      if (updatedUser.theme) {
+                        setTheme(updatedUser.theme);
+                        localStorage.setItem('bookshelf_theme', updatedUser.theme);
+                      }
                       
                       // Sincronizar alterações de perfil com Cloud Firestore em tempo real
                       if (updatedUser.uid) {
@@ -694,7 +719,8 @@ export default function App() {
                             avatarUrl: updatedUser.avatarUrl,
                             language: updatedUser.language || language,
                             bannerType: updatedUser.bannerType || 'none',
-                            bannerValue: updatedUser.bannerValue || ''
+                            bannerValue: updatedUser.bannerValue || '',
+                            theme: updatedUser.theme || theme
                           });
                         } catch (err) {
                           console.error("Falha ao sincronizar perfil com o Firestore:", err);

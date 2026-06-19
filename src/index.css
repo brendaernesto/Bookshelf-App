@@ -1,9 +1,6 @@
 @import "tailwindcss";
 
-@theme {
-  --font-serif: "Literata", Georgia, serif;
-  --font-sans: "Manrope", sans-serif;
-  
+:root {
   --color-primary: #e9b3ff;
   --color-primary-container: #bf6fe5;
   --color-on-primary: #510073;
@@ -19,11 +16,48 @@
   --color-error-container: #93000a;
 }
 
+:root.light {
+  --color-primary: #8327ad;
+  --color-primary-container: #f5e3fc;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #33004d;
+  --color-surface: #f8effb; /* "um fundo lilás quase branco" (lilac background almost white) */
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f1e2f5;
+  --color-surface-container: #e6d3f0;
+  --color-[#211a22]: #e6d3f0;
+  --color-surface-container-highest: #dbbfea;
+  --color-on-surface: #380a4f; /* "um tom de violeta escuro" (dark violet tone) */
+  --color-on-surface-variant: #593966;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+}
+
+@theme {
+  --font-serif: "Literata", Georgia, serif;
+  --font-sans: "Manrope", sans-serif;
+  
+  --color-primary: var(--color-primary);
+  --color-primary-container: var(--color-primary-container);
+  --color-on-primary: var(--color-on-primary);
+  --color-on-primary-container: var(--color-on-primary-container);
+  --color-surface: var(--color-surface);
+  --color-surface-container-lowest: var(--color-surface-container-lowest);
+  --color-surface-container-low: var(--color-surface-container-low);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-highest: var(--color-surface-container-highest);
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  --color-error: var(--color-error);
+  --color-error-container: var(--color-error-container);
+}
+
 body {
   font-family: var(--font-sans);
-  background-color: #171219;
-  color: #ebdfea;
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* 
