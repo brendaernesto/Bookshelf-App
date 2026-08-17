@@ -44,6 +44,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'LIBRARY' | 'EXPLORE' | 'WRITING' | 'PROFILE'>('LIBRARY');
   const [selectedFilter, setSelectedFilter] = useState<'TUDO' | 'LENDO' | 'CONCLUÍDO' | 'FAVORITOS'>('TUDO');
   const [searchQuery, setSearchQuery] = useState('');
+  const [exploreSearchQuery, setExploreSearchQuery] = useState('');
   
   // Form view attributes
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -642,10 +643,25 @@ export default function App() {
                           </p>
                           <p className="text-xs text-on-surface-variant/60 mt-1 max-w-xs mx-auto leading-normal">
                             {searchQuery
-                              ? (language === 'pt' ? 'Experimente ajustar os termos de pesquisa ou remover os filtros aplicados.' : language === 'es' ? 'Pruebe a ajustar los términos de búsqueda o a eliminar los filtros.' : 'Try adjusting your search query or clear selected category filter.')
+                              ? (language === 'pt' ? 'Nenhum livro encontrado na sua estante com esses termos.' : language === 'es' ? 'No se encontraron libros en tu estantería con estos términos.' : 'No books found in your shelf matching this query.')
                               : t.EMPTY_LIBRARY_SUB}
                           </p>
-                          {!searchQuery && (
+                          {searchQuery ? (
+                            <button
+                              onClick={() => {
+                                setExploreSearchQuery(searchQuery);
+                                setCurrentTab('EXPLORE');
+                              }}
+                              className="mt-4 bg-[#bf6fe5] text-white hover:bg-[#a14ac9] transition-all px-4 py-2.5 rounded-xl text-xs font-bold font-sans cursor-pointer active:scale-95 shadow-md flex items-center gap-1.5 mx-auto"
+                            >
+                              <span className="material-symbols-outlined notranslate text-sm" translate="no">globe_uk</span>
+                              {language === 'pt' 
+                                ? `Buscar "${searchQuery}" no Acervo Global 🌐` 
+                                : language === 'es' 
+                                  ? `Buscar "${searchQuery}" en el Catálogo Global 🌐` 
+                                  : `Search "${searchQuery}" in Global Catalog 🌐`}
+                            </button>
+                          ) : (
                             <button
                               onClick={() => setIsFormOpen(true)}
                               className="mt-4 bg-primary text-on-primary hover:bg-primary-container transition-colors px-4 py-2 rounded-xl text-xs font-bold font-sans cursor-pointer active:scale-95 shadow-sm"
@@ -678,7 +694,11 @@ export default function App() {
                   /* ========================================================
                      EXPLORE TAB (curated list suggestions)
                      ======================================================== */
-                  <ExploreView onAddPresetToList={handleAddPresetRecommendation} language={language} />
+                  <ExploreView
+                    onAddPresetToList={handleAddPresetRecommendation}
+                    language={language}
+                    initialSearchQuery={exploreSearchQuery}
+                  />
                 )}
 
                 {currentTab === 'WRITING' && (

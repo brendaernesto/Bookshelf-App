@@ -130,7 +130,7 @@ export default function LoginView({ onLogin, language, onLanguageChange }: Login
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#171119] p-margin-mobile relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-surface text-on-surface p-margin-mobile relative overflow-hidden">
       {/* Dynamic Language Switcher at Top Right */}
       <div className="absolute top-4 right-4 z-20 flex gap-1.5 bg-surface-container-low/40 p-1.5 rounded-xl border border-outline-variant/15 text-xs text-on-surface">
         {(['pt', 'en', 'es'] as Language[]).map((lang) => (
@@ -162,7 +162,7 @@ export default function LoginView({ onLogin, language, onLanguageChange }: Login
           <h1 className="font-serif text-3xl font-bold text-primary tracking-tight">
             Bookshelf
           </h1>
-          <p className="font-sans text-xs text-[#e5ccfa] mt-1 italic w-64 text-center" id="app-slogan">
+          <p className="font-sans text-xs text-primary mt-1 italic w-64 text-center" id="app-slogan">
             {t.APP_SLOGAN}
           </p>
         </div>

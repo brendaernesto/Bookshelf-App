@@ -446,7 +446,7 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
             </div>
 
             {/* NEW Background Banner Customize Subpanel */}
-            <div className="bg-[#211a22] border border-outline-variant/15 rounded-xl p-4 space-y-3.5">
+            <div className="bg-surface-container border border-outline-variant/15 rounded-xl p-4 space-y-3.5">
               <div className="flex items-center gap-2 text-xs font-bold text-[#e1bee7] border-b border-outline-variant/10 pb-2">
                 <span className="material-symbols-outlined text-base notranslate text-[#bf6fe5]" translate="no">image</span>
                 {BANNER_REG[language].SECTION_TITLE}

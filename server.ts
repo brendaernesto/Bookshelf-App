@@ -3,6 +3,10 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 
+// In-memory cache for ultra-fast response times on search queries
+const searchCache = new Map<string, { timestamp: number; books: any[] }>();
+const CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes cache
+
 // Intelligent dynamic fallback generator to guarantee searches never fail
 // even if the Gemini API key is missing or quota/limits are reached.
 function getDynamicFallbackBooks(query: string, language: string = "pt"): any[] {
@@ -186,16 +190,24 @@ async function startServer() {
     });
   };
 
-  // API route for searching books with web and Google search grounding
+  // API route for searching books with caching and fast search grounding
   app.get("/api/books/search", async (req, res) => {
     const query = req.query.q as string;
     if (!query || !query.trim()) {
       return res.status(400).json({ error: "Query parameter 'q' is required." });
     }
 
+    const lang = (req.query.lang as string) === "en" ? "en" : (req.query.lang as string) === "es" ? "es" : "pt";
+    const cacheKey = `${lang}:${query.toLowerCase().trim()}`;
+
+    // Instant return if cached and not expired
+    const cached = searchCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+      return res.json({ books: cached.books, source: 'cache' });
+    }
+
     console.log(`Searching for book match in modern index for query: "${query}"`);
 
-    const lang = (req.query.lang as string) === "en" ? "en" : "pt";
     let parsedBooks: any[] = [];
     const ai = getGoogleGenAIClient();
 
@@ -292,6 +304,11 @@ Include official title, main author, real world average rating (1.0 to 5.0), cov
     if (!parsedBooks || parsedBooks.length === 0) {
       console.log(`Activating client-optimized search grounding simulator for: "${query}"`);
       parsedBooks = getDynamicFallbackBooks(query, lang);
+    }
+
+    // Store in cache for ultra-rapid subsequent keystroke lookups
+    if (parsedBooks && parsedBooks.length > 0) {
+      searchCache.set(cacheKey, { timestamp: Date.now(), books: parsedBooks });
     }
 
     return res.json({ books: parsedBooks });
