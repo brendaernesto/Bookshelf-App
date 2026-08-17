@@ -2,7 +2,7 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "User profile with avatar, custom username, banner customized fields",
+      "description": "User profile with avatar, custom username, banner customized fields, and theme settings",
       "type": "object",
       "properties": {
         "email": { "type": "string", "description": "Email address of the owner" },
@@ -10,7 +10,8 @@
         "avatarUrl": { "type": "string", "description": "Web URL to user avatar photo" },
         "language": { "type": "string", "description": "User preferred interface language" },
         "bannerType": { "type": "string", "description": "Banner type option none/color/image" },
-        "bannerValue": { "type": "string", "description": "Hex code or Image URL value" }
+        "bannerValue": { "type": "string", "description": "Hex code or Image URL value" },
+        "theme": { "type": "string", "description": "Color theme dark or light" }
       },
       "required": ["email", "name", "avatarUrl"]
     },

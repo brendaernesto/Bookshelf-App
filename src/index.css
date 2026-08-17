@@ -59,7 +59,28 @@ body {
   background-color: var(--color-surface);
   color: var(--color-on-surface);
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), color 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* GPU acceleration for smooth transitions */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* Smooth spring-like button and link micro-interactions */
+button, a {
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 /* 
@@ -76,6 +97,7 @@ font,
 .material-symbols-outlined,
 [class*="material-symbols"] {
   font-family: 'Material Symbols Outlined' !important;
+  font-display: block;
 }
 
 .custom-shadow {

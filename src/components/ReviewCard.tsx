@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { BookReview, BookStatus } from '../types';
 import { TRANSLATIONS, Language } from '../translations';
 
@@ -83,7 +84,14 @@ export default function ReviewCard({
   };
 
   return (
-    <div className="bg-surface-container-lowest rounded-xl custom-shadow border border-outline-variant/20 overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-outline-variant/60">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      className="bg-surface-container-lowest rounded-xl custom-shadow border border-outline-variant/20 overflow-hidden transition-colors hover:border-outline-variant/50 gpu-accelerated"
+    >
       <div className="flex p-4 gap-4 relative">
         {/* Cover Thumbnail */}
         <div className="w-24 h-36 rounded-lg overflow-hidden bg-surface-container-highest flex-shrink-0 relative group">
@@ -92,7 +100,7 @@ export default function ReviewCard({
               src={review.coverUrl}
               alt={review.title}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-out"
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-surface-container-low border border-primary/10">
@@ -105,20 +113,22 @@ export default function ReviewCard({
             </div>
           )}
 
-          {/* Favorite heart overlay */}
-          <button
+          {/* Favorite heart overlay with spring bounce */}
+          <motion.button
+            whileTap={{ scale: 0.75 }}
+            whileHover={{ scale: 1.15 }}
             onClick={() => onFavoriteToggle(review.id)}
-            className="absolute top-1.5 right-1.5 bg-background/80 hover:bg-background h-7 w-7 rounded-full flex items-center justify-center transition-colors shadow-sm focus:outline-none cursor-pointer active:scale-90"
+            className="absolute top-1.5 right-1.5 bg-background/80 backdrop-blur-xs hover:bg-background h-7 w-7 rounded-full flex items-center justify-center transition-colors shadow-sm focus:outline-none cursor-pointer"
             title={review.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
           >
             <span
-              className={`material-symbols-outlined notranslate text-sm ${review.isFavorite ? 'text-tertiary' : 'text-on-surface-variant'}`}
+              className={`material-symbols-outlined notranslate text-sm transition-transform duration-200 ${review.isFavorite ? 'text-tertiary scale-110' : 'text-on-surface-variant'}`}
               translate="no"
               style={{ fontVariationSettings: review.isFavorite ? "'FILL' 1" : "'FILL' 0" }}
             >
               favorite
             </span>
-          </button>
+          </motion.button>
         </div>
 
         {/* Info Column */}
@@ -132,7 +142,7 @@ export default function ReviewCard({
                 {review.author || t.UNKNOWN_AUTHOR}
               </p>
             </div>
-            <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-wider shrink-0 uppercase ${getStatusStyle(review.status)}`}>
+            <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-wider shrink-0 uppercase transition-colors ${getStatusStyle(review.status)}`}>
               {getStatusLabel(review.status)}
             </span>
           </div>
@@ -179,66 +189,82 @@ export default function ReviewCard({
         </div>
       </div>
 
-      {/* Action Bar Dropdowns */}
-      {showStatusDropdown && (
-        <div className="border-t border-outline-variant/20 bg-surface-container p-2 flex gap-2 items-center justify-center animate-fadeIn">
-          <span className="text-[10px] font-bold text-on-surface-variant/85 uppercase mr-2">
-            {language === 'pt' ? 'Mudar para:' : language === 'es' ? 'Cambiar a:' : 'Change to:'}
-          </span>
-          {(['LENDO', 'CONCLUÍDO', 'PAUSADO'] as BookStatus[]).map((st) => (
-            <button
-              key={st}
-              disabled={review.status === st}
-              onClick={() => {
-                onStatusChange(review.id, st);
-                setShowStatusDropdown(false);
-              }}
-              className={`text-[10px] font-bold px-3 py-1 rounded transition-all active:scale-95 cursor-pointer ${
-                review.status === st
-                  ? 'bg-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed'
-                  : 'bg-surface hover:bg-primary/20 text-primary hover:text-white border border-primary/20'
-              }`}
-            >
-              {st === 'LENDO' ? t.STATUS_LENDO : st === 'CONCLUÍDO' ? t.STATUS_CONCLUIDO : t.STATUS_PAUSADO}
-            </button>
-          ))}
-          <button
-            onClick={() => setShowStatusDropdown(false)}
-            className="text-[10px] text-error bg-error/10 hover:bg-error/20 p-1.5 rounded-full transition-colors font-bold shrink-0 ml-auto"
+      {/* Action Bar Dropdowns with AnimatePresence */}
+      <AnimatePresence>
+        {showStatusDropdown && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="border-t border-outline-variant/20 bg-surface-container p-2 flex gap-2 items-center justify-center overflow-hidden"
           >
-            <span className="material-symbols-outlined notranslate text-[14px]" translate="no">close</span>
-          </button>
-        </div>
-      )}
+            <span className="text-[10px] font-bold text-on-surface-variant/85 uppercase mr-2">
+              {language === 'pt' ? 'Mudar para:' : language === 'es' ? 'Cambiar a:' : 'Change to:'}
+            </span>
+            {(['LENDO', 'CONCLUÍDO', 'PAUSADO'] as BookStatus[]).map((st) => (
+              <button
+                key={st}
+                disabled={review.status === st}
+                onClick={() => {
+                  onStatusChange(review.id, st);
+                  setShowStatusDropdown(false);
+                }}
+                className={`text-[10px] font-bold px-3 py-1 rounded transition-all active:scale-95 cursor-pointer ${
+                  review.status === st
+                    ? 'bg-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed'
+                    : 'bg-surface hover:bg-primary/20 text-primary hover:text-white border border-primary/20'
+                }`}
+              >
+                {st === 'LENDO' ? t.STATUS_LENDO : st === 'CONCLUÍDO' ? t.STATUS_CONCLUIDO : t.STATUS_PAUSADO}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowStatusDropdown(false)}
+              className="text-[10px] text-error bg-error/10 hover:bg-error/20 p-1.5 rounded-full transition-colors font-bold shrink-0 ml-auto cursor-pointer"
+            >
+              <span className="material-symbols-outlined notranslate text-[14px]" translate="no">close</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {showDeleteConfirm && (
-        <div className="border-t border-outline-variant/20 bg-error-container/20 p-3 flex flex-col sm:flex-row gap-3 items-center justify-between animate-fadeIn">
-          <span className="text-xs font-semibold text-error text-center sm:text-left">
-            {language === 'pt' 
-              ? `Deseja excluir permanentemente "${review.title}"?` 
-              : language === 'es'
-              ? `¿Desea eliminar permanentemente "${review.title}"?`
-              : `Permanently delete "${review.title}"?`}
-          </span>
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              className="text-xs bg-surface-container hover:bg-surface-container-high px-3 py-1.5 rounded-lg transition-colors font-semibold text-on-surface cursor-pointer focus:outline-none"
-            >
-              {t.CANCEL}
-            </button>
-            <button
-              onClick={() => {
-                onDelete(review.id);
-                setShowDeleteConfirm(false);
-              }}
-              className="text-xs bg-error hover:bg-opacity-95 text-surface px-3 py-1.5 rounded-lg transition-all font-bold cursor-pointer active:scale-95 focus:outline-none"
-            >
-              {t.YES_DELETE}
-            </button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="border-t border-outline-variant/20 bg-error-container/20 p-3 flex flex-col sm:flex-row gap-3 items-center justify-between overflow-hidden"
+          >
+            <span className="text-xs font-semibold text-error text-center sm:text-left">
+              {language === 'pt' 
+                ? `Deseja excluir permanentemente "${review.title}"?` 
+                : language === 'es'
+                ? `¿Desea eliminar permanentemente "${review.title}"?`
+                : `Permanently delete "${review.title}"?`}
+            </span>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="text-xs bg-surface-container hover:bg-surface-container-high px-3 py-1.5 rounded-lg transition-colors font-semibold text-on-surface cursor-pointer focus:outline-none active:scale-95"
+              >
+                {t.CANCEL}
+              </button>
+              <button
+                onClick={() => {
+                  onDelete(review.id);
+                  setShowDeleteConfirm(false);
+                }}
+                className="text-xs bg-error hover:bg-opacity-95 text-surface px-3 py-1.5 rounded-lg transition-all font-bold cursor-pointer active:scale-95 focus:outline-none"
+              >
+                {t.YES_DELETE}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Action Bar */}
       <div className="border-t border-outline-variant/20 flex divide-x divide-outline-variant/20 bg-surface/30">
@@ -262,7 +288,7 @@ export default function ReviewCard({
             showStatusDropdown ? 'bg-surface-container-low text-white font-bold' : ''
           }`}
         >
-          <span className="material-symbols-outlined notranslate text-[16px] text-primary animate-spin duration-1000" translate="no" style={{ animationIterationCount: showStatusDropdown ? 'infinite' : '0' }}>sync</span>
+          <span className="material-symbols-outlined notranslate text-[16px] text-primary transition-transform duration-300" translate="no" style={{ transform: showStatusDropdown ? 'rotate(180deg)' : 'none' }}>sync</span>
           {language === 'pt' ? 'Status' : language === 'es' ? 'Estado' : 'Status'}
         </button>
         <button
@@ -278,6 +304,6 @@ export default function ReviewCard({
           {t.DELETE}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }

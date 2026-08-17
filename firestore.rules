@@ -27,7 +27,7 @@ service cloud.firestore {
     // Validation for UserProfile
     function isValidUserProfile(data) {
       return data.keys().hasAll(['email', 'name', 'avatarUrl'])
-        && data.keys().size() >= 3 && data.keys().size() <= 6
+        && data.keys().size() >= 3 && data.keys().size() <= 8
         && data.email is string && data.email.size() <= 256
         && data.name is string && data.name.size() <= 128
         && data.avatarUrl is string && data.avatarUrl.size() <= 1500000; // Allow larger strings for base64 uploads

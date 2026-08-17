@@ -3,6 +3,7 @@ import { TRANSLATIONS, Language } from '../translations';
 import { UserProfile } from '../types';
 import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { AnimatePresence, motion } from 'motion/react';
 
 interface BookQuote {
   id: string;
@@ -168,7 +169,7 @@ export default function WritingView({ language, user }: WritingViewProps) {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto pb-32 space-y-6 animate-in fade-in duration-300">
+    <div className="w-full max-w-2xl mx-auto pb-32 space-y-6">
       <div className="border-b border-outline-variant/20 pb-4">
         <h2 className="text-xl font-serif font-bold text-primary flex items-center gap-2">
           <span className="material-symbols-outlined notranslate text-primary" translate="no">edit_note</span>
@@ -179,14 +180,22 @@ export default function WritingView({ language, user }: WritingViewProps) {
         </p>
       </div>
 
-      {toastMessage && (
-        <div className="bg-[#e86295]/20 text-[#ffb1c8] border border-[#e86295]/35 p-3 rounded-xl text-xs text-center font-bold animate-pulse">
-          📝 {toastMessage}
-        </div>
-      )}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.96 }}
+            transition={{ duration: 0.2 }}
+            className="bg-[#e86295]/20 text-[#ffb1c8] border border-[#e86295]/35 p-3 rounded-xl text-xs text-center font-bold"
+          >
+            📝 {toastMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Input box */}
-      <section className="bg-surface-container-low p-5 rounded-2xl border border-outline-variant/30">
+      <section className="bg-surface-container-low p-5 rounded-2xl border border-outline-variant/30 shadow-xs">
         <form onSubmit={handleSaveQuote} className="space-y-4">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[#dfb9ed] ml-1 flex justify-between items-center">
             <span>
@@ -195,7 +204,7 @@ export default function WritingView({ language, user }: WritingViewProps) {
                 : (language === 'pt' ? 'Refletir sobre a Leitura' : language === 'es' ? 'Reflexionar sobre la Lectura' : 'Reflect on Reading')}
             </span>
             {editingQuote && (
-              <span className="text-[9px] bg-[#e86295]/20 text-[#ffb1c8] px-2 py-0.5 rounded-md animate-pulse font-sans font-bold">
+              <span className="text-[9px] bg-[#e86295]/20 text-[#ffb1c8] px-2 py-0.5 rounded-md font-sans font-bold">
                 {language === 'pt' ? 'Modo de Edição' : language === 'es' ? 'Modo de Edición' : 'Edit Mode'}
               </span>
             )}
@@ -212,7 +221,7 @@ export default function WritingView({ language, user }: WritingViewProps) {
               placeholder="Ex: O Grande Gatsby"
               value={bookTitle}
               onChange={(e) => setBookTitle(e.target.value)}
-              className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary transition-all"
             />
           </div>
 
@@ -227,7 +236,7 @@ export default function WritingView({ language, user }: WritingViewProps) {
                 placeholder="Ex: 42"
                 value={page}
                 onChange={(e) => setPage(e.target.value)}
-                className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
             <div>
@@ -240,7 +249,7 @@ export default function WritingView({ language, user }: WritingViewProps) {
                 placeholder="Ex: Capítulo 3"
                 value={chapter}
                 onChange={(e) => setChapter(e.target.value)}
-                className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
           </div>
@@ -256,23 +265,25 @@ export default function WritingView({ language, user }: WritingViewProps) {
               placeholder={t.INSERT_QUOTE_PLACEHOLDER}
               value={quoteText}
               onChange={(e) => setQuoteText(e.target.value)}
-              className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary resize-none placeholder:text-on-surface-variant/40"
+              className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary resize-none placeholder:text-on-surface-variant/40 transition-all"
             />
           </div>
 
           <div className="flex gap-2.5">
             {editingQuote && (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 type="button"
                 onClick={handleCancelEdit}
-                className="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant/30 font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1"
+                className="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant/30 font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
               >
                 {language === 'pt' ? 'Cancelar / Sair' : language === 'es' ? 'Cancelar / Salir' : 'Cancel / Exit'}
-              </button>
+              </motion.button>
             )}
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               type="submit"
-              className="flex-1 bg-[#bf6fe5] hover:bg-[#a656cc] text-on-primary font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer shadow-md active:scale-95 flex items-center justify-center gap-1"
+              className="flex-1 bg-[#bf6fe5] hover:bg-[#a656cc] text-on-primary font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer shadow-md flex items-center justify-center gap-1"
             >
               <span className="material-symbols-outlined notranslate text-sm" translate="no">
                 {editingQuote ? 'done' : 'bookmarks'}
@@ -281,7 +292,7 @@ export default function WritingView({ language, user }: WritingViewProps) {
                 ? (language === 'pt' ? 'Salvar Alterações' : language === 'es' ? 'Guardar Cambios' : 'Save Changes')
                 : t.ADD_QUOTE
               }
-            </button>
+            </motion.button>
           </div>
         </form>
       </section>
@@ -301,52 +312,61 @@ export default function WritingView({ language, user }: WritingViewProps) {
             {t.NO_QUOTES}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {quotes.map((item) => (
-              <div
-                key={item.id}
-                className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/10 flex flex-col justify-between hover:border-primary/25 transition-colors relative group animate-in slide-in-from-left-4 duration-300"
-              >
-                <div>
-                  <div className="flex justify-between items-start gap-2 mb-1.5">
-                    <span className="text-[10px] font-bold bg-[#bf6fe5]/10 text-[#e9b3ff] px-2 py-0.5 rounded uppercase font-sans truncate max-w-[70%]">
-                      {item.bookTitle}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleStartEditQuote(item)}
-                        className="text-on-surface-variant hover:text-[#e9b3ff] transition-colors focus:outline-none opacity-40 group-hover:opacity-100 cursor-pointer p-0.5"
-                        title={language === 'pt' ? 'Editar' : language === 'es' ? 'Editar' : 'Edit'}
-                      >
-                        <span className="material-symbols-outlined notranslate text-xs" translate="no">edit</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteQuote(item.id)}
-                        className="text-on-surface-variant hover:text-error transition-colors focus:outline-none opacity-40 group-hover:opacity-100 cursor-pointer p-0.5"
-                        title={t.DELETE}
-                      >
-                        <span className="material-symbols-outlined notranslate text-xs" translate="no">delete</span>
-                      </button>
+          <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <AnimatePresence mode="popLayout">
+              {quotes.map((item) => (
+                <motion.div
+                  layout
+                  key={item.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/10 flex flex-col justify-between hover:border-primary/25 transition-colors relative group"
+                >
+                  <div>
+                    <div className="flex justify-between items-start gap-2 mb-1.5">
+                      <span className="text-[10px] font-bold bg-[#bf6fe5]/10 text-[#e9b3ff] px-2 py-0.5 rounded uppercase font-sans truncate max-w-[70%]">
+                        {item.bookTitle}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <motion.button
+                          whileTap={{ scale: 0.85 }}
+                          onClick={() => handleStartEditQuote(item)}
+                          className="text-on-surface-variant hover:text-[#e9b3ff] transition-colors focus:outline-none opacity-40 group-hover:opacity-100 cursor-pointer p-0.5"
+                          title={language === 'pt' ? 'Editar' : language === 'es' ? 'Editar' : 'Edit'}
+                        >
+                          <span className="material-symbols-outlined notranslate text-xs" translate="no">edit</span>
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.85 }}
+                          onClick={() => handleDeleteQuote(item.id)}
+                          className="text-on-surface-variant hover:text-error transition-colors focus:outline-none opacity-40 group-hover:opacity-100 cursor-pointer p-0.5"
+                          title={t.DELETE}
+                        >
+                          <span className="material-symbols-outlined notranslate text-xs" translate="no">delete</span>
+                        </motion.button>
+                      </div>
                     </div>
+
+                    <p className="font-serif italic text-xs leading-relaxed text-on-surface pt-1 border-t border-outline-variant/10 text-justify">
+                      "{item.quoteText}"
+                    </p>
                   </div>
 
-                  <p className="font-serif italic text-xs leading-relaxed text-on-surface pt-1 border-t border-outline-variant/10 text-justify">
-                    "{item.quoteText}"
-                  </p>
-                </div>
-
-                <div className="flex gap-2 text-[9px] text-[#dfb9ed] mt-3 font-semibold justify-end">
-                  {item.page && <span>{language === 'pt' ? 'Pág.' : language === 'es' ? 'Pág.' : 'P.'} {item.page}</span>}
-                  {item.chapter && (
-                    <>
-                      <span>•</span>
-                      <span>{language === 'pt' ? 'Cap.' : language === 'es' ? 'Cap.' : 'Ch.'} {item.chapter}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                  <div className="flex gap-2 text-[9px] text-[#dfb9ed] mt-3 font-semibold justify-end">
+                    {item.page && <span>{language === 'pt' ? 'Pág.' : language === 'es' ? 'Pág.' : 'P.'} {item.page}</span>}
+                    {item.chapter && (
+                      <>
+                        <span>•</span>
+                        <span>{language === 'pt' ? 'Cap.' : language === 'es' ? 'Cap.' : 'Ch.'} {item.chapter}</span>
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         )}
       </section>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { BookReview, BookStatus, UserProfile } from './types';
 import { INITIAL_REVIEWS } from './initialData';
@@ -441,23 +441,27 @@ export default function App() {
     }
   };
 
-  // Filter & Search calculation logic
-  const filteredReviews = reviews.filter((rev) => {
-    const matchesSearch =
-      rev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      rev.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      rev.tags.some((tg) => tg.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (rev.reviewText && rev.reviewText.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Filter & Search calculation logic with useMemo for instantaneous rendering
+  const filteredReviews = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return reviews.filter((rev) => {
+      if (query) {
+        const matchesSearch =
+          rev.title.toLowerCase().includes(query) ||
+          rev.author.toLowerCase().includes(query) ||
+          rev.tags.some((tg) => tg.toLowerCase().includes(query)) ||
+          (rev.reviewText && rev.reviewText.toLowerCase().includes(query));
+        if (!matchesSearch) return false;
+      }
 
-    if (!matchesSearch) return false;
+      if (selectedFilter === 'TUDO') return true;
+      if (selectedFilter === 'LENDO') return rev.status === 'LENDO';
+      if (selectedFilter === 'CONCLUÍDO') return rev.status === 'CONCLUÍDO';
+      if (selectedFilter === 'FAVORITOS') return rev.isFavorite;
 
-    if (selectedFilter === 'TUDO') return true;
-    if (selectedFilter === 'LENDO') return rev.status === 'LENDO';
-    if (selectedFilter === 'CONCLUÍDO') return rev.status === 'CONCLUÍDO';
-    if (selectedFilter === 'FAVORITOS') return rev.isFavorite;
-
-    return true;
-  });
+      return true;
+    });
+  }, [reviews, searchQuery, selectedFilter]);
 
   // If user is not logged in, render the login shield view
   if (!user) {
@@ -474,47 +478,55 @@ export default function App() {
   }
 
   return (
-    <div className="bg-surface text-on-surface min-h-screen pb-28 relative animate-fadeIn">
+    <div className="bg-surface text-on-surface min-h-screen pb-28 relative font-sans">
       {/* Real-time Toast Notifications */}
-      {toast && (
-        <div
-          className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-6 py-2.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 border backdrop-blur-md transition-all duration-300 ${
-            toast.isError
-              ? 'bg-[#ffebee]/95 text-[#c62828] border-[#ef9a9a]'
-              : 'bg-[#f3e5f5]/95 text-[#6a1b9a] border-[#e1bee7] shadow-[#bf6fe5]/20 shadow-md'
-          }`}
-        >
-          <span className="material-symbols-outlined notranslate text-base" translate="no">
-            {toast.isError ? 'error_outline' : 'done'}
-          </span>
-          <span>{toast.message}</span>
-        </div>
-      )}
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-2.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 border backdrop-blur-md ${
+              toast.isError
+                ? 'bg-[#ffebee]/95 text-[#c62828] border-[#ef9a9a]'
+                : 'bg-[#f3e5f5]/95 text-[#6a1b9a] border-[#e1bee7] shadow-[#bf6fe5]/20 shadow-md'
+            }`}
+          >
+            <span className="material-symbols-outlined notranslate text-base" translate="no">
+              {toast.isError ? 'error_outline' : 'done'}
+            </span>
+            <span>{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence mode="wait" initial={false}>
         {isFormOpen ? (
           /* ========================================================
              FORM VIEW (Add / Edit Screen)
              ======================================================== */
           <motion.div
             key="edit-form-screen"
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -30 }}
-            transition={{ duration: 0.3 }}
-            className="px-margin-mobile pt-4"
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="px-margin-mobile pt-4 gpu-accelerated"
           >
             {/* Header Form Navigation */}
             <header className="flex justify-between items-center h-16 w-full max-w-2xl mx-auto mb-4 border-b border-outline-variant/10">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.9 }}
                 onClick={() => {
                   setEditingReview(null);
                   setIsFormOpen(false);
                 }}
-                className="text-on-surface hover:text-primary transition-colors flex items-center justify-center p-2 rounded-full hover:bg-surface-container active:scale-95 cursor-pointer focus:outline-none"
+                className="text-on-surface hover:text-primary transition-colors flex items-center justify-center p-2 rounded-full hover:bg-surface-container cursor-pointer focus:outline-none"
               >
                 <span className="material-symbols-outlined notranslate" translate="no">arrow_back</span>
-              </button>
-              <h1 className="font-serif text-lg font-bold text-primary animate-fadeIn">
+              </motion.button>
+              <h1 className="font-serif text-lg font-bold text-primary">
                 {editingReview ? t.FORM_EDIT_TITLE : t.FORM_ADD_TITLE}
               </h1>
               <div className="w-10"></div> {/* Balanced spacing helper */}
@@ -539,53 +551,55 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="gpu-accelerated"
           >
             {/* Main Header panel */}
-            <header className="bg-surface sticky top-0 z-40 flex justify-between items-center px-margin-mobile w-full h-16 border-b border-outline-variant/15 select-none shadow-sm backdrop-blur-md bg-opacity-95">
+            <header className="bg-surface/95 sticky top-0 z-40 flex justify-between items-center px-margin-mobile w-full h-16 border-b border-outline-variant/15 select-none shadow-xs backdrop-blur-md transition-colors">
               <div className="flex items-center gap-3">
-                <div className="text-primary flex items-center animate-pulse">
+                <div className="text-primary flex items-center">
                   <span className="material-symbols-outlined notranslate text-2xl" translate="no">menu_book</span>
                 </div>
-                <h1 className="font-serif text-xl font-bold text-primary">
+                <h1 className="font-serif text-xl font-bold text-primary tracking-tight">
                   {t.LIBRARY}
                 </h1>
               </div>
 
               {/* Logging details / user avatar */}
-              <div
+              <motion.div
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setCurrentTab('PROFILE')}
-                className="flex items-center gap-2 cursor-pointer group hover:opacity-90 active:scale-95 transition-all"
+                className="flex items-center gap-2 cursor-pointer group hover:opacity-90 transition-all"
                 title="Minha Conta"
               >
-                <div className="w-9 h-9 rounded-full bg-[#bf6fe5]/20 hover:scale-105 transition-transform overflow-hidden flex items-center justify-center border border-[#e9b3ff]/30">
+                <div className="w-9 h-9 rounded-full bg-[#bf6fe5]/20 hover:scale-105 transition-transform overflow-hidden flex items-center justify-center border border-[#e9b3ff]/30 shadow-xs">
                   <img
                     alt={user.name}
-                    className="w-full h-full object-cover animate-fadeIn"
+                    className="w-full h-full object-cover"
                     src={user.avatarUrl}
                     referrerPolicy="no-referrer"
                   />
                 </div>
-              </div>
+              </motion.div>
             </header>
 
             <main className="px-margin-mobile mt-6">
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait" initial={false}>
                 {currentTab === 'LIBRARY' && (
                   /* ========================================================
                      LIBRARY TAB (Scrolling chips, Search, Review Cards, list block)
                      ======================================================== */
                   <motion.section
                     key="library-tab"
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    className="space-y-4 gpu-accelerated"
                   >
                     {/* Integrated Quick Search bar */}
                     <div className="relative max-w-2xl mx-auto mb-2 group">
-                      <span className="material-symbols-outlined notranslate text-on-surface-variant/50 absolute left-4 top-1/2 -translate-y-1/2 text-sm group-focus-within:text-primary" translate="no">
+                      <span className="material-symbols-outlined notranslate text-on-surface-variant/50 absolute left-4 top-1/2 -translate-y-1/2 text-sm group-focus-within:text-primary transition-colors" translate="no">
                         search
                       </span>
                       <input
@@ -605,7 +619,7 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* Filter scrolling feed row */}
+                    {/* Filter scrolling feed row with gliding spring pill indicator */}
                     <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 max-w-2xl mx-auto -mx-margin-mobile px-margin-mobile sm:mx-auto">
                       {(['TUDO', 'LENDO', 'CONCLUÍDO', 'FAVORITOS'] as const).map((filter) => {
                         const isSel = selectedFilter === filter;
@@ -619,22 +633,32 @@ export default function App() {
                           <button
                             key={filter}
                             onClick={() => setSelectedFilter(filter)}
-                            className={`rounded-full px-5 py-2 text-[10px] font-bold uppercase tracking-wider flex-shrink-0 transition-all active:scale-95 cursor-pointer border ${
-                              isSel
-                                ? 'bg-primary text-on-primary border-primary shadow-sm'
-                                : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/10'
-                            }`}
+                            className="relative rounded-full px-5 py-2 text-[10px] font-bold uppercase tracking-wider flex-shrink-0 cursor-pointer focus:outline-none transition-colors"
                           >
-                            {filterLabel}
+                            {isSel && (
+                              <motion.div
+                                layoutId="active-filter-indicator"
+                                className="absolute inset-0 bg-primary rounded-full shadow-xs"
+                                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                              />
+                            )}
+                            <span className={`relative z-10 transition-colors duration-150 ${isSel ? 'text-on-primary font-extrabold' : 'text-on-surface-variant hover:text-on-surface'}`}>
+                              {filterLabel}
+                            </span>
                           </button>
                         );
                       })}
                     </div>
 
-                    {/* Book Cards count feed */}
-                    <div className="space-y-4 mt-2 max-w-2xl mx-auto">
+                    {/* Book Cards count feed with smooth layout transitions */}
+                    <motion.div layout className="space-y-4 mt-2 max-w-2xl mx-auto">
                       {filteredReviews.length === 0 ? (
-                        <div className="bg-surface-container-low rounded-2xl border border-outline-variant/20 p-8 text-center">
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.96 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.2 }}
+                          className="bg-surface-container-low rounded-2xl border border-outline-variant/20 p-8 text-center"
+                        >
                           <span className="material-symbols-outlined notranslate text-5xl text-outline-variant/60 block mb-2" translate="no">
                             explore_off
                           </span>
@@ -647,12 +671,13 @@ export default function App() {
                               : t.EMPTY_LIBRARY_SUB}
                           </p>
                           {searchQuery ? (
-                            <button
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
                               onClick={() => {
                                 setExploreSearchQuery(searchQuery);
                                 setCurrentTab('EXPLORE');
                               }}
-                              className="mt-4 bg-[#bf6fe5] text-white hover:bg-[#a14ac9] transition-all px-4 py-2.5 rounded-xl text-xs font-bold font-sans cursor-pointer active:scale-95 shadow-md flex items-center gap-1.5 mx-auto"
+                              className="mt-4 bg-[#bf6fe5] text-white hover:bg-[#a14ac9] transition-all px-4 py-2.5 rounded-xl text-xs font-bold font-sans cursor-pointer shadow-md flex items-center gap-1.5 mx-auto"
                             >
                               <span className="material-symbols-outlined notranslate text-sm" translate="no">globe_uk</span>
                               {language === 'pt' 
@@ -660,33 +685,36 @@ export default function App() {
                                 : language === 'es' 
                                   ? `Buscar "${searchQuery}" en el Catálogo Global 🌐` 
                                   : `Search "${searchQuery}" in Global Catalog 🌐`}
-                            </button>
+                            </motion.button>
                           ) : (
-                            <button
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
                               onClick={() => setIsFormOpen(true)}
-                              className="mt-4 bg-primary text-on-primary hover:bg-primary-container transition-colors px-4 py-2 rounded-xl text-xs font-bold font-sans cursor-pointer active:scale-95 shadow-sm"
+                              className="mt-4 bg-primary text-on-primary hover:bg-primary-container transition-colors px-4 py-2 rounded-xl text-xs font-bold font-sans cursor-pointer shadow-sm"
                             >
                               {t.ADD_REVIEW}
-                            </button>
+                            </motion.button>
                           )}
-                        </div>
+                        </motion.div>
                       ) : (
-                        filteredReviews.map((item) => (
-                          <ReviewCard
-                            key={item.id}
-                            review={item}
-                            onEdit={(rev) => {
-                              setEditingReview(rev);
-                              setIsFormOpen(true);
-                            }}
-                            onDelete={handleDeleteReview}
-                            onStatusChange={handleStatusChange}
-                            onFavoriteToggle={handleFavoriteToggle}
-                            language={language}
-                          />
-                        ))
+                        <AnimatePresence mode="popLayout">
+                          {filteredReviews.map((item) => (
+                            <ReviewCard
+                              key={item.id}
+                              review={item}
+                              onEdit={(rev) => {
+                                setEditingReview(rev);
+                                setIsFormOpen(true);
+                              }}
+                              onDelete={handleDeleteReview}
+                              onStatusChange={handleStatusChange}
+                              onFavoriteToggle={handleFavoriteToggle}
+                              language={language}
+                            />
+                          ))}
+                        </AnimatePresence>
                       )}
-                    </div>
+                    </motion.div>
                   </motion.section>
                 )}
 
@@ -694,127 +722,156 @@ export default function App() {
                   /* ========================================================
                      EXPLORE TAB (curated list suggestions)
                      ======================================================== */
-                  <ExploreView
-                    onAddPresetToList={handleAddPresetRecommendation}
-                    language={language}
-                    initialSearchQuery={exploreSearchQuery}
-                  />
+                  <motion.div
+                    key="explore-tab"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    className="gpu-accelerated"
+                  >
+                    <ExploreView
+                      onAddPresetToList={handleAddPresetRecommendation}
+                      language={language}
+                      initialSearchQuery={exploreSearchQuery}
+                    />
+                  </motion.div>
                 )}
 
                 {currentTab === 'WRITING' && (
                   /* ========================================================
                      WRITING TAB (Draft workspace, notes, quote log book)
                      ======================================================== */
-                  <WritingView language={language} user={user} />
+                  <motion.div
+                    key="writing-tab"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    className="gpu-accelerated"
+                  >
+                    <WritingView language={language} user={user} />
+                  </motion.div>
                 )}
 
                 {currentTab === 'PROFILE' && (
                   /* ========================================================
                      PROFILE TAB (Brenda Ernesto summary page, counters, targets)
                      ======================================================== */
-                  <ProfileView
-                    profile={user}
-                    reviews={reviews}
-                    onLogout={handleLogout}
-                    language={language}
-                    onUpdateProfile={async (updatedUser) => {
-                      setUser(updatedUser);
-                      localStorage.setItem('bookshelf_user', JSON.stringify(updatedUser));
-                      if (updatedUser.language) {
-                        setLanguage(updatedUser.language);
-                        localStorage.setItem('bookshelf_language', updatedUser.language);
-                      }
-                      if (updatedUser.theme) {
-                        setTheme(updatedUser.theme);
-                        localStorage.setItem('bookshelf_theme', updatedUser.theme);
-                      }
-                      
-                      // Sincronizar alterações de perfil com Cloud Firestore em tempo real
-                      if (updatedUser.uid) {
-                        try {
-                          const docRef = doc(db, 'users', updatedUser.uid);
-                          await setDoc(docRef, {
-                            email: updatedUser.email,
-                            name: updatedUser.name,
-                            avatarUrl: updatedUser.avatarUrl,
-                            language: updatedUser.language || language,
-                            bannerType: updatedUser.bannerType || 'none',
-                            bannerValue: updatedUser.bannerValue || '',
-                            theme: updatedUser.theme || theme
-                          });
-                        } catch (err) {
-                          console.error("Falha ao sincronizar perfil com o Firestore:", err);
+                  <motion.div
+                    key="profile-tab"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    className="gpu-accelerated"
+                  >
+                    <ProfileView
+                      profile={user}
+                      reviews={reviews}
+                      onLogout={handleLogout}
+                      language={language}
+                      onUpdateProfile={async (updatedUser) => {
+                        setUser(updatedUser);
+                        localStorage.setItem('bookshelf_user', JSON.stringify(updatedUser));
+                        if (updatedUser.language) {
+                          setLanguage(updatedUser.language);
+                          localStorage.setItem('bookshelf_language', updatedUser.language);
                         }
-                      }
-                    }}
-                  />
+                        if (updatedUser.theme) {
+                          setTheme(updatedUser.theme);
+                          localStorage.setItem('bookshelf_theme', updatedUser.theme);
+                        }
+                        
+                        // Sincronizar alterações de perfil com Cloud Firestore em tempo real
+                        if (updatedUser.uid) {
+                          try {
+                            const docRef = doc(db, 'users', updatedUser.uid);
+                            await setDoc(docRef, {
+                              email: updatedUser.email,
+                              name: updatedUser.name,
+                              avatarUrl: updatedUser.avatarUrl,
+                              language: updatedUser.language || language,
+                              bannerType: updatedUser.bannerType || 'none',
+                              bannerValue: updatedUser.bannerValue || '',
+                              theme: updatedUser.theme || theme
+                            });
+                          } catch (err) {
+                            console.error("Falha ao sincronizar perfil com o Firestore:", err);
+                          }
+                        }
+                      }}
+                    />
+                  </motion.div>
                 )}
               </AnimatePresence>
             </main>
 
             {/* Bottom floating plus button (FAB) trigger (only renders on Library library list view tab) */}
-            {currentTab === 'LIBRARY' && (
-              <button
-                onClick={() => {
-                  setEditingReview(null);
-                  setIsFormOpen(true);
-                }}
-                className="fixed right-6 bottom-24 w-14 h-14 bg-primary text-on-primary rounded-full fab-shadow flex items-center justify-center active:scale-95 transition-all cursor-pointer duration-300 hover:scale-105 z-50 hover:bg-white hover:text-on-primary-container animate-pulse"
-                title={t.ADD_REVIEW}
-              >
-                <span className="material-symbols-outlined notranslate text-3xl font-bold" translate="no">add</span>
-              </button>
-            )}
+            <AnimatePresence>
+              {currentTab === 'LIBRARY' && (
+                <motion.button
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+                  onClick={() => {
+                    setEditingReview(null);
+                    setIsFormOpen(true);
+                  }}
+                  className="fixed right-6 bottom-24 w-14 h-14 bg-primary text-on-primary rounded-full fab-shadow flex items-center justify-center cursor-pointer z-50 hover:bg-white hover:text-on-primary-container"
+                  title={t.ADD_REVIEW}
+                >
+                  <span className="material-symbols-outlined notranslate text-3xl font-bold" translate="no">add</span>
+                </motion.button>
+              )}
+            </AnimatePresence>
 
-            {/* Fixed Navigation Bottom bar */}
-            <nav className="fixed bottom-0 left-0 w-full z-50 bg-[#231e25] border-t border-outline-variant/15 flex justify-around items-center px-4 py-3.5 shadow-lg select-none">
-              <button
-                onClick={() => setCurrentTab('LIBRARY')}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-full px-5 py-1.5 transition-all text-xs font-semibold focus:outline-none cursor-pointer ${
-                  currentTab === 'LIBRARY'
-                    ? 'bg-primary-container text-on-primary-container font-bold shadow-sm scale-102'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/40'
-                }`}
-              >
-                <span className="material-symbols-outlined notranslate text-xl" translate="no" style={{ fontVariationSettings: currentTab === 'LIBRARY' ? "'FILL' 1" : "'FILL' 0" }}>auto_stories</span>
-                <span className="text-[10px]">{t.LIBRARY}</span>
-              </button>
-
-              <button
-                onClick={() => setCurrentTab('EXPLORE')}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-full px-5 py-1.5 transition-all text-xs font-semibold focus:outline-none cursor-pointer ${
-                  currentTab === 'EXPLORE'
-                    ? 'bg-primary-container text-on-primary-container font-bold shadow-sm scale-102'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/40'
-                }`}
-              >
-                <span className="material-symbols-outlined notranslate text-xl" translate="no" style={{ fontVariationSettings: currentTab === 'EXPLORE' ? "'FILL' 1" : "'FILL' 0" }}>explore</span>
-                <span className="text-[10px]">{t.EXPLORE}</span>
-              </button>
-
-              <button
-                onClick={() => setCurrentTab('WRITING')}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-full px-5 py-1.5 transition-all text-xs font-semibold focus:outline-none cursor-pointer ${
-                  currentTab === 'WRITING'
-                    ? 'bg-primary-container text-on-primary-container font-bold shadow-sm scale-102'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/40'
-                }`}
-              >
-                <span className="material-symbols-outlined notranslate text-xl" translate="no" style={{ fontVariationSettings: currentTab === 'WRITING' ? "'FILL' 1" : "'FILL' 0" }}>edit_note</span>
-                <span className="text-[10px]">{t.WRITING}</span>
-              </button>
-
-              <button
-                onClick={() => setCurrentTab('PROFILE')}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-full px-5 py-1.5 transition-all text-xs font-semibold focus:outline-none cursor-pointer ${
-                  currentTab === 'PROFILE'
-                    ? 'bg-primary-container text-on-primary-container font-bold shadow-sm scale-102'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/40'
-                }`}
-              >
-                <span className="material-symbols-outlined notranslate text-xl" translate="no" style={{ fontVariationSettings: currentTab === 'PROFILE' ? "'FILL' 1" : "'FILL' 0" }}>person</span>
-                <span className="text-[10px]">{t.PROFILE}</span>
-              </button>
+            {/* Fixed Navigation Bottom bar with gliding spring indicator */}
+            <nav className="fixed bottom-0 left-0 w-full z-50 bg-[#231e25]/95 backdrop-blur-lg border-t border-outline-variant/15 flex justify-around items-center px-4 py-2.5 shadow-lg select-none">
+              {(
+                [
+                  { id: 'LIBRARY', icon: 'auto_stories', label: t.LIBRARY },
+                  { id: 'EXPLORE', icon: 'explore', label: t.EXPLORE },
+                  { id: 'WRITING', icon: 'edit_note', label: t.WRITING },
+                  { id: 'PROFILE', icon: 'person', label: t.PROFILE }
+                ] as const
+              ).map((tab) => {
+                const isActive = currentTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCurrentTab(tab.id)}
+                    className="relative flex flex-col items-center justify-center py-1 px-4 text-xs font-semibold focus:outline-none cursor-pointer group"
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="bottom-nav-active-pill"
+                        className="absolute inset-0 bg-primary-container/80 rounded-2xl shadow-xs"
+                        transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                      />
+                    )}
+                    <span
+                      className={`material-symbols-outlined notranslate text-xl relative z-10 transition-transform duration-200 ${
+                        isActive ? 'text-on-primary-container scale-110' : 'text-on-surface-variant group-hover:text-on-surface'
+                      }`}
+                      translate="no"
+                      style={{ fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0" }}
+                    >
+                      {tab.icon}
+                    </span>
+                    <span
+                      className={`text-[10px] relative z-10 tracking-tight transition-colors duration-200 ${
+                        isActive ? 'text-on-primary-container font-bold' : 'text-on-surface-variant group-hover:text-on-surface'
+                      }`}
+                    >
+                      {tab.label}
+                    </span>
+                  </button>
+                );
+              })}
             </nav>
           </motion.div>
         )}

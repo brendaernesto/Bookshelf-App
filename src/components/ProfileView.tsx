@@ -189,7 +189,7 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
   const [tempUrl, setTempUrl] = useState('');
 
   const totalReviews = reviews.length;
-  const [quotesCount] = useState(() => {
+  const [quotesCount, setQuotesCount] = useState(() => {
     try {
       const saved = localStorage.getItem('bookshelf_quotes');
       if (saved) {
@@ -201,6 +201,19 @@ export default function ProfileView({ profile, reviews, onLogout, onUpdateProfil
     }
     return 0;
   });
+
+  useEffect(() => {
+    if (!profile.uid) return;
+    const fetchQuotesCount = async () => {
+      try {
+        const snap = await getDocs(collection(db, `users/${profile.uid}/quotes`));
+        setQuotesCount(snap.size);
+      } catch (err) {
+        console.warn("Could not retrieve quotes count from Firestore:", err);
+      }
+    };
+    fetchQuotesCount();
+  }, [profile.uid]);
   const readingCount = reviews.filter((r) => r.status === 'LENDO').length;
   const finishedCount = reviews.filter((r) => r.status === 'CONCLUÍDO').length;
   const pausedCount = reviews.filter((r) => r.status === 'PAUSADO').length;
