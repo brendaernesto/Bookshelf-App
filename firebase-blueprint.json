@@ -48,7 +48,9 @@
         "tags": { "type": "array", "description": "Array of categorized hashtag strings" },
         "isFavorite": { "type": "boolean", "description": "Marker if saved as favorite" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Review registration timestamp" },
-        "userId": { "type": "string", "description": "The Firestore UID of the owner" }
+        "userId": { "type": "string", "description": "The Firestore UID of the owner" },
+        "pagesRead": { "type": "number", "description": "Current pages read by user" },
+        "totalPages": { "type": "number", "description": "Total pages of the book" }
       },
       "required": [
         "id",

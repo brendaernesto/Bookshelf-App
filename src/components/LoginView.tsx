@@ -4,6 +4,8 @@ import { auth, googleProvider, signInWithPopup, signInAnonymously } from '../fir
 import { OAuthProvider } from 'firebase/auth';
 import { TRANSLATIONS, Language } from '../translations';
 
+import { sanitizeText } from '../utils/sanitize';
+
 interface LoginViewProps {
   onLogin: (profile: UserProfile) => void;
   language: Language;
@@ -105,12 +107,14 @@ export default function LoginView({ onLogin, language, onLanguageChange }: Login
     e.preventDefault();
     if (!customName.trim()) return;
     setLoading(true);
+    const safeName = sanitizeText(customName);
+    const safeEmail = sanitizeText(customEmail);
     try {
       const result = await signInAnonymously(auth);
       const user = result.user;
       onLogin({
-        email: customEmail.trim() || `${user.uid}@bookshelf.com`,
-        name: customName.trim() || 'Leitor Apaixonado',
+        email: safeEmail || `${user.uid}@bookshelf.com`,
+        name: safeName || 'Leitor Apaixonado',
         avatarUrl: 'https://picsum.photos/seed/bookshelfavatar/150/150',
         uid: user.uid,
         language: language
@@ -118,8 +122,8 @@ export default function LoginView({ onLogin, language, onLanguageChange }: Login
     } catch (err) {
       console.warn("Authentication failed, falling back to local credentials:", err);
       onLogin({
-        email: customEmail.trim() || 'usuario@bookshelf.com',
-        name: customName.trim() || 'Leitor Apaixonado',
+        email: safeEmail || 'usuario@bookshelf.com',
+        name: safeName || 'Leitor Apaixonado',
         avatarUrl: 'https://picsum.photos/seed/bookshelfavatar/150/150',
         uid: 'local-user-' + Date.now(),
         language: language
@@ -131,17 +135,19 @@ export default function LoginView({ onLogin, language, onLanguageChange }: Login
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface text-on-surface p-margin-mobile relative overflow-hidden">
-      {/* Dynamic Language Switcher at Top Right */}
-      <div className="absolute top-4 right-4 z-20 flex gap-1.5 bg-surface-container-low/40 p-1.5 rounded-xl border border-outline-variant/15 text-xs text-on-surface">
+      {/* Dynamic Language Switcher at Top Right (with min 44x44px touch targets) */}
+      <div className="absolute top-4 right-4 z-20 flex gap-1.5 bg-surface-container-low/60 p-1.5 rounded-xl border border-outline-variant/20 text-xs text-on-surface backdrop-blur-md">
         {(['pt', 'en', 'es'] as Language[]).map((lang) => (
           <button
             key={lang}
             onClick={() => onLanguageChange(lang)}
-            className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all tracking-wider ${
+            className={`min-w-[44px] min-h-[44px] px-3 py-2 rounded-lg text-xs font-bold uppercase transition-all tracking-wider flex items-center justify-center focus-visible:ring-2 focus-visible:ring-primary cursor-pointer ${
               language === lang
                 ? 'bg-primary text-on-primary shadow-sm'
                 : 'text-on-surface-variant hover:text-white hover:bg-surface-container'
             }`}
+            aria-label={`Mudar idioma para ${lang === 'pt' ? 'Português' : lang === 'en' ? 'English' : 'Español'}`}
+            title={lang === 'pt' ? 'Português' : lang === 'en' ? 'English' : 'Español'}
           >
             {lang}
           </button>

@@ -14,6 +14,9 @@ import ProfileView from './components/ProfileView';
 import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth, signOut, handleFirestoreError, OperationType } from './firebase';
+import { DataService } from './services/dataService';
+import ToastNotification from './components/common/ToastNotification';
+import { SkeletonBookCard } from './components/common/Skeleton';
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -44,12 +47,31 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'LIBRARY' | 'EXPLORE' | 'WRITING' | 'PROFILE'>('LIBRARY');
   const [selectedFilter, setSelectedFilter] = useState<'TUDO' | 'LENDO' | 'CONCLUÍDO' | 'FAVORITOS'>('TUDO');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'date' | 'rating' | 'title' | 'author'>('date');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [exploreSearchQuery, setExploreSearchQuery] = useState('');
+
+  // 6-second safe delete with undo state
+  const [undoState, setUndoState] = useState<{
+    review: BookReview;
+    index: number;
+    timerId: any;
+  } | null>(null);
   
   // Form view attributes
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingReview, setEditingReview] = useState<BookReview | null>(null);
   const [toast, setToast] = useState<{ message: string; isError?: boolean } | null>(null);
+  const [isLoadingBooks, setIsLoadingBooks] = useState(true);
+
+  // Debounce search query by 250ms (Item 3.8)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   const t = TRANSLATIONS[language];
 
@@ -93,6 +115,31 @@ export default function App() {
     }
     localStorage.setItem('bookshelf_theme', theme);
   }, [theme]);
+
+  // Instant keyboard shortcuts for desktop & tablet power users (1=Library, 2=Explore, 3=Writing, 4=Profile, /=Search)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (e.key === '1') {
+        setCurrentTab('LIBRARY');
+      } else if (e.key === '2') {
+        setCurrentTab('EXPLORE');
+      } else if (e.key === '3') {
+        setCurrentTab('WRITING');
+      } else if (e.key === '4') {
+        setCurrentTab('PROFILE');
+      } else if (e.key === '/' && currentTab === 'LIBRARY' && !isFormOpen) {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+        if (searchInput) searchInput.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentTab, isFormOpen]);
 
   // Load user info from localStorage on mount & subscribe to real Firebase Auth changes
   useEffect(() => {
@@ -230,37 +277,19 @@ export default function App() {
         console.warn("Could not retrieve cloud user profile, fallback is active:", err);
       }
 
-      // 2. Fetch User evaluation listings from Cloud Firestore
-      const reviewsPath = `users/${userId}/reviews`;
+      // 2. Fetch User evaluation listings via Centralized DataService (Item 8.1)
+      setIsLoadingBooks(true);
       try {
-        const qSnapshot = await getDocs(collection(db, reviewsPath));
-        if (!qSnapshot.empty) {
-          const list: BookReview[] = [];
-          qSnapshot.forEach((docSnap) => {
-            list.push(docSnap.data() as BookReview);
-          });
-          // Sort list by creation date (descending)
-          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setReviews(list);
-          localStorage.setItem('bookshelf_reviews', JSON.stringify(list));
+        const booksResult = await DataService.getBooks(userId);
+        if (booksResult.success && booksResult.data) {
+          setReviews(booksResult.data);
         } else {
-          // If Firestore is empty, keep library empty so users can add manually
           setReviews([]);
-          localStorage.setItem('bookshelf_reviews', JSON.stringify([]));
         }
       } catch (error) {
-        console.warn("Could not fetch cloud data, loading local cache:", error);
-        const savedReviews = localStorage.getItem('bookshelf_reviews');
-        if (savedReviews) {
-          try {
-            setReviews(JSON.parse(savedReviews));
-          } catch (e) {
-            console.error(e);
-            setReviews([]);
-          }
-        } else {
-          setReviews([]);
-        }
+        console.warn("[App] Could not fetch data via DataService:", error);
+      } finally {
+        setIsLoadingBooks(false);
       }
     };
 
@@ -288,121 +317,159 @@ export default function App() {
   const handleSaveReview = async (formData: Omit<BookReview, 'id' | 'createdAt'> & { id?: string }) => {
     if (!user) return;
     const userId = user.uid || 'default-user';
-    const path = `users/${userId}/reviews`;
-    
-    let targetId = formData.id;
-    let createdAt = new Date().toISOString();
-    
-    if (formData.id) {
-       const original = reviews.find((r) => r.id === formData.id);
-       if (original) {
-         createdAt = original.createdAt;
-       }
-    } else {
-       targetId = 'review-' + Date.now();
-    }
-
-    const reviewDocRef = doc(db, `users/${userId}/reviews`, targetId!);
-    const rawReviewData = {
-      id: targetId!,
-      title: formData.title,
-      author: formData.author,
-      status: formData.status,
-      rating: formData.rating,
-      coverUrl: formData.coverUrl,
-      reviewText: formData.reviewText,
-      tags: formData.tags,
-      isFavorite: formData.isFavorite,
-      createdAt: createdAt,
-      userId: userId
-    };
 
     try {
-      await setDoc(reviewDocRef, rawReviewData);
-      
-      let updatedReviews: BookReview[];
-      if (formData.id) {
-        updatedReviews = reviews.map((r) => r.id === formData.id ? rawReviewData : r);
-        showToast(t.TOAST_EDITED);
+      const res = await DataService.saveBook(formData, userId);
+      if (res.success && res.data) {
+        let updatedReviews: BookReview[];
+        if (formData.id) {
+          updatedReviews = reviews.map((r) => (r.id === formData.id ? res.data! : r));
+          showToast(t.TOAST_EDITED);
+        } else {
+          updatedReviews = [res.data, ...reviews];
+          showToast(t.TOAST_SAVED);
+        }
+        setReviews(updatedReviews);
+        setEditingReview(null);
+        setIsFormOpen(false);
       } else {
-        updatedReviews = [rawReviewData, ...reviews];
-        showToast(t.TOAST_SAVED);
+        showToast(t.TOAST_SAVED_ERROR, true);
       }
-      
-      setReviews(updatedReviews);
-      localStorage.setItem('bookshelf_reviews', JSON.stringify(updatedReviews));
-      setEditingReview(null);
-      setIsFormOpen(false);
     } catch (error) {
       showToast(t.TOAST_SAVED_ERROR, true);
-      handleFirestoreError(error, OperationType.WRITE, `${path}/${targetId}`);
     }
   };
 
-  const handleDeleteReview = async (id: string) => {
+  // Safe Delete with 6-second Undo (Item 3.2)
+  const handleDeleteReview = (id: string) => {
+    if (!user) return;
+    const targetIndex = reviews.findIndex((r) => r.id === id);
+    if (targetIndex === -1) return;
+    const targetReview = reviews[targetIndex];
+
+    // If there's an active undo timer from a previous delete, finalize that deletion immediately
+    if (undoState) {
+      clearTimeout(undoState.timerId);
+      const userId = user.uid || 'default-user';
+      deleteDoc(doc(db, `users/${userId}/reviews`, undoState.review.id)).catch((err) => {
+        console.warn("Could not commit previous deletion:", err);
+      });
+    }
+
+    // Immediately remove from state & local storage for instant responsiveness
+    const updated = reviews.filter((r) => r.id !== id);
+    setReviews(updated);
+    localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
+
+    // Schedule actual permanent Firestore deletion after 6 seconds via DataService
+    const timerId = setTimeout(async () => {
+      try {
+        const userId = user.uid || 'default-user';
+        await DataService.deleteBook(targetReview.id, userId);
+      } catch (error) {
+        console.warn("Could not delete from Firestore:", error);
+      }
+      setUndoState((curr) => (curr?.review.id === targetReview.id ? null : curr));
+    }, 6000);
+
+    setUndoState({
+      review: targetReview,
+      index: targetIndex,
+      timerId
+    });
+  };
+
+  const handleUndoDelete = () => {
+    if (!undoState) return;
+    clearTimeout(undoState.timerId);
+
+    // Restore review back to reviews array at previous index
+    const restored = [...reviews];
+    restored.splice(undoState.index, 0, undoState.review);
+    setReviews(restored);
+    localStorage.setItem('bookshelf_reviews', JSON.stringify(restored));
+    setUndoState(null);
+    showToast(t.ACTION_UNDONE);
+  };
+
+  // Interactive Star Rating Change directly on card (Item 3.10)
+  const handleRatingChange = async (id: string, newRating: number) => {
     if (!user) return;
     const userId = user.uid || 'default-user';
-    const path = `users/${userId}/reviews/${id}`;
-    
-    try {
-      const reviewDocRef = doc(db, `users/${userId}/reviews`, id);
-      await deleteDoc(reviewDocRef);
-      
-      const updated = reviews.filter((r) => r.id !== id);
-      setReviews(updated);
-      localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
-      showToast(t.TOAST_DELETED);
-    } catch (error) {
-      showToast(t.TOAST_DELETED_ERROR, true);
-      handleFirestoreError(error, OperationType.DELETE, path);
+
+    // Optimistic UI update
+    const updated = reviews.map((r) => (r.id === id ? { ...r, rating: newRating } : r));
+    setReviews(updated);
+    localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
+
+    const res = await DataService.updateBookPartial(id, { rating: newRating }, userId);
+    if (!res.success) {
+      showToast(t.TOAST_UPDATE_ERROR, true);
+    }
+  };
+
+  // Reading Progress Update for LENDO directly on card (Item 3.3)
+  const handleUpdateProgress = async (id: string, pagesRead: number, totalPages: number) => {
+    if (!user) return;
+    const userId = user.uid || 'default-user';
+
+    // Optimistic UI update
+    const updated = reviews.map((r) =>
+      r.id === id ? { ...r, pagesRead, totalPages } : r
+    );
+    setReviews(updated);
+    localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
+
+    const res = await DataService.updateBookPartial(id, { pagesRead, totalPages }, userId);
+    if (res.success) {
+      showToast(t.SAVE_PROGRESS);
+    } else {
+      showToast(t.TOAST_UPDATE_ERROR, true);
     }
   };
 
   const handleStatusChange = async (id: string, newStatus: BookStatus) => {
     if (!user) return;
     const userId = user.uid || 'default-user';
-    const path = `users/${userId}/reviews/${id}`;
     
-    try {
-      const reviewDocRef = doc(db, `users/${userId}/reviews`, id);
-      await updateDoc(reviewDocRef, { status: newStatus });
-      
-      const updated = reviews.map((r) => (r.id === id ? { ...r, status: newStatus } : r));
-      setReviews(updated);
-      localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
-      
-      const localizedStatus = newStatus === 'LENDO' ? t.STATUS_LENDO : newStatus === 'CONCLUÍDO' ? t.STATUS_CONCLUIDO : t.STATUS_PAUSADO;
-      showToast(`${t.TOAST_STATUS_UPDATED}: ${localizedStatus}`);
-    } catch (error) {
+    const updated = reviews.map((r) => (r.id === id ? { ...r, status: newStatus } : r));
+    setReviews(updated);
+    localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
+    
+    const localizedStatus = newStatus === 'LENDO' ? t.STATUS_LENDO : newStatus === 'CONCLUÍDO' ? t.STATUS_CONCLUIDO : t.STATUS_PAUSADO;
+    showToast(`${t.TOAST_STATUS_UPDATED}: ${localizedStatus}`);
+
+    const res = await DataService.updateBookPartial(id, { status: newStatus }, userId);
+    if (!res.success) {
       showToast(t.TOAST_UPDATE_ERROR, true);
-      handleFirestoreError(error, OperationType.UPDATE, path);
     }
   };
 
   const handleFavoriteToggle = async (id: string) => {
     if (!user) return;
     const userId = user.uid || 'default-user';
-    const path = `users/${userId}/reviews/${id}`;
     
     const target = reviews.find((r) => r.id === id);
     if (!target) return;
     const newFavorite = !target.isFavorite;
     
-    try {
-      const reviewDocRef = doc(db, `users/${userId}/reviews`, id);
-      await updateDoc(reviewDocRef, { isFavorite: newFavorite });
-      
-      const updated = reviews.map((r) => (r.id === id ? { ...r, isFavorite: newFavorite } : r));
-      setReviews(updated);
-      localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
-      showToast(newFavorite ? t.TOAST_FAV_ADDED : t.TOAST_FAV_REMOVED);
-    } catch (error) {
+    const updated = reviews.map((r) => (r.id === id ? { ...r, isFavorite: newFavorite } : r));
+    setReviews(updated);
+    localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
+    showToast(newFavorite ? t.TOAST_FAV_ADDED : t.TOAST_FAV_REMOVED);
+
+    const res = await DataService.updateBookPartial(id, { isFavorite: newFavorite }, userId);
+    if (!res.success) {
       showToast(t.TOAST_UPDATE_ERROR, true);
-      handleFirestoreError(error, OperationType.UPDATE, path);
     }
   };
 
-  const handleAddPresetRecommendation = async (title: string, author: string, coverUrl: string) => {
+  const handleAddPresetRecommendation = async (
+    title: string,
+    author: string,
+    coverUrl: string,
+    status: BookStatus = 'LENDO'
+  ) => {
     if (!user) return;
     const userId = user.uid || 'default-user';
     const id = 'recommendation-' + Date.now();
@@ -412,10 +479,10 @@ export default function App() {
       id,
       title,
       author,
-      status: 'LENDO',
+      status: status,
       rating: 4.5,
       coverUrl,
-      reviewText: language === 'pt' ? 'Adicionado do Explorar.' : language === 'es' ? 'Agregado de Explorar.' : 'Added from Explore.',
+      reviewText: t.ADDED_FROM_EXPLORE,
       tags: ['#Sugerido', '#LeituraFutura'],
       isFavorite: false,
       createdAt: new Date().toISOString(),
@@ -430,38 +497,71 @@ export default function App() {
       setReviews(updated);
       localStorage.setItem('bookshelf_reviews', JSON.stringify(updated));
       
-      // Automatically pop open the review writer form so they can write their custom resenha!
-      setEditingReview(newReview);
-      setIsFormOpen(true);
-      
-      showToast(language === 'pt' ? 'Livro adicionado! Escreva sua resenha ou configure os detalhes abaixo.' : language === 'es' ? '¡Libro agregado! Escribe tu reseña o edita los detalles del libro.' : 'Book added! Write your review or edit book parameters below.');
+      showToast(t.TOAST_BOOK_ADDED_DETAILS);
     } catch (error) {
       showToast(t.TOAST_UPDATE_ERROR, true);
       handleFirestoreError(error, OperationType.WRITE, path);
     }
   };
 
-  // Filter & Search calculation logic with useMemo for instantaneous rendering
-  const filteredReviews = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return reviews.filter((rev) => {
-      if (query) {
-        const matchesSearch =
-          rev.title.toLowerCase().includes(query) ||
-          rev.author.toLowerCase().includes(query) ||
-          rev.tags.some((tg) => tg.toLowerCase().includes(query)) ||
-          (rev.reviewText && rev.reviewText.toLowerCase().includes(query));
-        if (!matchesSearch) return false;
-      }
+  // Real-time tab counts calculation (Item 3.6)
+  const tabCounts = useMemo(() => {
+    return {
+      all: reviews.length,
+      reading: reviews.filter((r) => r.status === 'LENDO').length,
+      finished: reviews.filter((r) => r.status === 'CONCLUÍDO').length,
+      favorites: reviews.filter((r) => r.isFavorite).length
+    };
+  }, [reviews]);
 
-      if (selectedFilter === 'TUDO') return true;
+  // Filter & Search calculation logic with debounce (250ms), tag filtering, and sorting (Items 3.7 & 3.8)
+  const filteredReviews = useMemo(() => {
+    const query = debouncedSearchQuery.trim().toLowerCase();
+    
+    // 1. Status / Favorite tab filter
+    let list = reviews.filter((rev) => {
       if (selectedFilter === 'LENDO') return rev.status === 'LENDO';
       if (selectedFilter === 'CONCLUÍDO') return rev.status === 'CONCLUÍDO';
       if (selectedFilter === 'FAVORITOS') return rev.isFavorite;
-
-      return true;
+      return true; // 'TUDO'
     });
-  }, [reviews, searchQuery, selectedFilter]);
+
+    // 2. Clickable tag filter (Item 3.7)
+    if (selectedTag) {
+      const cleanActiveTag = selectedTag.toLowerCase().replace(/^#/, '');
+      list = list.filter((rev) =>
+        rev.tags && rev.tags.some((tg) => tg.toLowerCase().replace(/^#/, '') === cleanActiveTag)
+      );
+    }
+
+    // 3. Debounced search query match (Item 3.8)
+    if (query) {
+      list = list.filter((rev) => {
+        const matchesTitle = rev.title.toLowerCase().includes(query);
+        const matchesAuthor = rev.author.toLowerCase().includes(query);
+        const matchesTags = rev.tags && rev.tags.some((tg) => tg.toLowerCase().includes(query));
+        const matchesReview = rev.reviewText ? rev.reviewText.toLowerCase().includes(query) : false;
+        return matchesTitle || matchesAuthor || matchesTags || matchesReview;
+      });
+    }
+
+    // 4. Sorting: rating, date, title, author (Item 3.7)
+    list = [...list].sort((a, b) => {
+      if (sortBy === 'rating') {
+        return (b.rating || 0) - (a.rating || 0);
+      }
+      if (sortBy === 'title') {
+        return a.title.localeCompare(b.title);
+      }
+      if (sortBy === 'author') {
+        return (a.author || '').localeCompare(b.author || '');
+      }
+      // Default: date added (newest first)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    return list;
+  }, [reviews, debouncedSearchQuery, selectedFilter, selectedTag, sortBy]);
 
   // If user is not logged in, render the login shield view
   if (!user) {
@@ -479,24 +579,49 @@ export default function App() {
 
   return (
     <div className="bg-surface text-on-surface min-h-screen pb-28 relative font-sans">
-      {/* Real-time Toast Notifications */}
+      {/* Real-time Toast Notifications with role="status" and aria-live="polite" (Item 7.6) */}
+      <ToastNotification
+        toast={toast}
+        onClose={() => setToast(null)}
+        closeAriaLabel={t.CLOSE_MODAL}
+      />
+
+      {/* 6-Second Safe Delete Undo Toast (Item 3.2) */}
       <AnimatePresence>
-        {toast && (
+        {undoState && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-2.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 border backdrop-blur-md ${
-              toast.isError
-                ? 'bg-[#ffebee]/95 text-[#c62828] border-[#ef9a9a]'
-                : 'bg-[#f3e5f5]/95 text-[#6a1b9a] border-[#e1bee7] shadow-[#bf6fe5]/20 shadow-md'
-            }`}
+            className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-[110] bg-surface-container-highest text-on-surface border border-outline-variant/40 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3.5 max-w-md w-[calc(100%-2rem)] backdrop-blur-md overflow-hidden"
           >
-            <span className="material-symbols-outlined notranslate text-base" translate="no">
-              {toast.isError ? 'error_outline' : 'done'}
-            </span>
-            <span>{toast.message}</span>
+            <div className="w-8 h-8 rounded-full bg-error/15 text-error flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined notranslate text-base" translate="no">
+                delete
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate text-on-surface">
+                {t.BOOK_DELETED_TOAST}: <span className="font-bold text-primary">"{undoState.review.title}"</span>
+              </p>
+              <p className="text-[10px] text-on-surface-variant/70">
+                {language === 'pt' ? 'Clique em Desfazer para restaurar' : language === 'es' ? 'Haga clic en Deshacer para restaurar' : 'Click Undo to restore'}
+              </p>
+            </div>
+            <button
+              onClick={handleUndoDelete}
+              className="px-3.5 py-1.5 bg-primary text-on-primary hover:bg-primary-container rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
+            >
+              {t.UNDO}
+            </button>
+            {/* Animated 6-second countdown bar */}
+            <motion.div
+              initial={{ width: '100%' }}
+              animate={{ width: '0%' }}
+              transition={{ duration: 6, ease: 'linear' }}
+              className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-primary to-[#bf6fe5]"
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -508,21 +633,22 @@ export default function App() {
              ======================================================== */
           <motion.div
             key="edit-form-screen"
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="px-margin-mobile pt-4 gpu-accelerated"
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            className="px-4 sm:px-6 pt-4 max-w-3xl mx-auto gpu-accelerated"
           >
             {/* Header Form Navigation */}
-            <header className="flex justify-between items-center h-16 w-full max-w-2xl mx-auto mb-4 border-b border-outline-variant/10">
+            <header className="flex justify-between items-center h-16 w-full max-w-3xl mx-auto mb-4 border-b border-outline-variant/10">
               <motion.button
                 whileTap={{ scale: 0.9 }}
                 onClick={() => {
                   setEditingReview(null);
                   setIsFormOpen(false);
                 }}
-                className="text-on-surface hover:text-primary transition-colors flex items-center justify-center p-2 rounded-full hover:bg-surface-container cursor-pointer focus:outline-none"
+                className="text-on-surface hover:text-primary transition-colors flex items-center justify-center p-2 rounded-full hover:bg-surface-container cursor-pointer focus:outline-none min-h-[44px] min-w-[44px]"
+                aria-label={t.CANCEL}
               >
                 <span className="material-symbols-outlined notranslate" translate="no">arrow_back</span>
               </motion.button>
@@ -551,54 +677,118 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
             className="gpu-accelerated"
           >
-            {/* Main Header panel */}
-            <header className="bg-surface/95 sticky top-0 z-40 flex justify-between items-center px-margin-mobile w-full h-16 border-b border-outline-variant/15 select-none shadow-xs backdrop-blur-md transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="text-primary flex items-center">
-                  <span className="material-symbols-outlined notranslate text-2xl" translate="no">menu_book</span>
+            {/* Main Header panel with Top Bar Contract: Zone 1 (Brand), Zone 2 (Desktop Nav), Zone 3 (Action & Profile) */}
+            <header className="bg-surface/95 sticky top-0 z-40 w-full border-b border-outline-variant/15 select-none shadow-xs backdrop-blur-md transition-colors">
+              <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+                {/* Zone 1: Brand title */}
+                <div 
+                  onClick={() => setCurrentTab('LIBRARY')}
+                  className="flex items-center gap-2.5 cursor-pointer group whitespace-nowrap shrink-0"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <span className="material-symbols-outlined notranslate text-xl" translate="no">menu_book</span>
+                  </div>
+                  <h1 className="font-serif text-xl font-bold text-primary tracking-tight">
+                    Bookshelf
+                  </h1>
                 </div>
-                <h1 className="font-serif text-xl font-bold text-primary tracking-tight">
-                  {t.LIBRARY}
-                </h1>
-              </div>
 
-              {/* Logging details / user avatar */}
-              <motion.div
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setCurrentTab('PROFILE')}
-                className="flex items-center gap-2 cursor-pointer group hover:opacity-90 transition-all"
-                title="Minha Conta"
-              >
-                <div className="w-9 h-9 rounded-full bg-[#bf6fe5]/20 hover:scale-105 transition-transform overflow-hidden flex items-center justify-center border border-[#e9b3ff]/30 shadow-xs">
-                  <img
-                    alt={user.name}
-                    className="w-full h-full object-cover"
-                    src={user.avatarUrl}
-                    referrerPolicy="no-referrer"
-                  />
+                {/* Zone 2: Desktop Navigation Links (hidden on mobile, sleek on md/lg/xl) */}
+                <nav className="hidden md:flex items-center gap-1 bg-surface-container-low/90 p-1 rounded-2xl border border-outline-variant/15 shadow-inner">
+                  {(
+                    [
+                      { id: 'LIBRARY', icon: 'auto_stories', label: t.LIBRARY },
+                      { id: 'EXPLORE', icon: 'explore', label: t.EXPLORE },
+                      { id: 'WRITING', icon: 'edit_note', label: t.WRITING },
+                      { id: 'PROFILE', icon: 'person', label: t.PROFILE }
+                    ] as const
+                  ).map((tab) => {
+                    const isActive = currentTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setCurrentTab(tab.id)}
+                        className="relative px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 focus:outline-none cursor-pointer transition-colors whitespace-nowrap shrink-0 min-h-[38px]"
+                      >
+                        {isActive && (
+                          <motion.div
+                            layoutId="desktop-nav-active-pill"
+                            className="absolute inset-0 bg-primary rounded-xl shadow-xs"
+                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                          />
+                        )}
+                        <span
+                          className={`material-symbols-outlined notranslate text-base relative z-10 transition-colors ${
+                            isActive ? 'text-on-primary font-bold' : 'text-on-surface-variant hover:text-on-surface'
+                          }`}
+                          translate="no"
+                        >
+                          {tab.icon}
+                        </span>
+                        <span
+                          className={`relative z-10 font-bold transition-colors ${
+                            isActive ? 'text-on-primary font-bold' : 'text-on-surface-variant hover:text-on-surface'
+                          }`}
+                        >
+                          {tab.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                {/* Zone 3: Primary Action & Profile Avatar */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setEditingReview(null);
+                      setIsFormOpen(true);
+                    }}
+                    className="hidden sm:inline-flex items-center gap-1.5 bg-primary text-on-primary hover:bg-primary-container px-3.5 py-2 rounded-xl text-xs font-bold font-sans cursor-pointer active:scale-95 transition-all shadow-xs min-h-[40px]"
+                  >
+                    <span className="material-symbols-outlined notranslate text-sm font-bold" translate="no">add</span>
+                    <span>{t.ADD_REVIEW}</span>
+                  </motion.button>
+
+                  <motion.div
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setCurrentTab('PROFILE')}
+                    className="flex items-center gap-2 cursor-pointer group hover:opacity-90 transition-all p-0.5"
+                    title={t.PROFILE}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-[#bf6fe5]/20 hover:scale-105 transition-transform overflow-hidden flex items-center justify-center border border-[#e9b3ff]/30 shadow-xs">
+                      <img
+                        alt={user.name}
+                        className="w-full h-full object-cover"
+                        src={user.avatarUrl}
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  </motion.div>
                 </div>
-              </motion.div>
+              </div>
             </header>
 
-            <main className="px-margin-mobile mt-6">
+            <main className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 mt-6">
               <AnimatePresence mode="wait" initial={false}>
                 {currentTab === 'LIBRARY' && (
                   /* ========================================================
-                     LIBRARY TAB (Scrolling chips, Search, Review Cards, list block)
+                     LIBRARY TAB (Scrolling chips, Search, Review Cards, responsive grid)
                      ======================================================== */
                   <motion.section
                     key="library-tab"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
                     className="space-y-4 gpu-accelerated"
                   >
-                    {/* Integrated Quick Search bar */}
-                    <div className="relative max-w-2xl mx-auto mb-2 group">
+                    {/* Integrated Quick Search bar (centered max-w-xl, debounced with 250ms) */}
+                    <div className="relative max-w-xl mx-auto mb-2 group">
                       <span className="material-symbols-outlined notranslate text-on-surface-variant/50 absolute left-4 top-1/2 -translate-y-1/2 text-sm group-focus-within:text-primary transition-colors" translate="no">
                         search
                       </span>
@@ -607,33 +797,38 @@ export default function App() {
                         placeholder={t.SEARCH_PLACEHOLDER}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl pl-10 pr-10 py-3 text-xs focus:border-primary focus:outline-none transition-all placeholder:text-on-surface-variant/30 text-on-surface focus:ring-1 focus:ring-primary/25"
+                        className="w-full bg-surface-container border border-outline-variant/30 rounded-2xl pl-10 pr-12 py-3 text-xs focus:border-primary focus:outline-none transition-all placeholder:text-on-surface-variant/60 text-on-surface focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
                       />
                       {searchQuery && (
                         <button
+                          type="button"
                           onClick={() => setSearchQuery('')}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-primary transition-colors focus:outline-none cursor-pointer"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors focus-visible:ring-2 focus-visible:ring-primary cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl"
+                          title={t.CLEAR_SEARCH_BUTTON}
+                          aria-label={t.CLEAR_SEARCH_BUTTON}
                         >
-                          <span className="material-symbols-outlined notranslate text-xs" translate="no">close</span>
+                          <span className="material-symbols-outlined notranslate text-sm" translate="no">close</span>
                         </button>
                       )}
                     </div>
 
-                    {/* Filter scrolling feed row with gliding spring pill indicator */}
-                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 max-w-2xl mx-auto -mx-margin-mobile px-margin-mobile sm:mx-auto">
-                      {(['TUDO', 'LENDO', 'CONCLUÍDO', 'FAVORITOS'] as const).map((filter) => {
-                        const isSel = selectedFilter === filter;
-                        let filterLabel = filter;
-                        if (filter === 'TUDO') filterLabel = t.STATUS_TUDO;
-                        else if (filter === 'LENDO') filterLabel = t.STATUS_LENDO;
-                        else if (filter === 'CONCLUÍDO') filterLabel = t.STATUS_CONCLUIDO;
-                        else if (filter === 'FAVORITOS') filterLabel = t.STATUS_FAVORITOS;
+                    {/* Filter scrolling feed row with real-time count badges & centered layout (Item 3.6 & 3.9) */}
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 max-w-xl mx-auto justify-center px-2">
+                      {(
+                        [
+                          { id: 'TUDO', label: `${t.TAB_ALL} (${tabCounts.all})` },
+                          { id: 'LENDO', label: `${t.TAB_READING} (${tabCounts.reading})` },
+                          { id: 'CONCLUÍDO', label: `${t.TAB_FINISHED} (${tabCounts.finished})` },
+                          { id: 'FAVORITOS', label: `${t.TAB_FAVORITES} (${tabCounts.favorites})` }
+                        ] as const
+                      ).map((filter) => {
+                        const isSel = selectedFilter === filter.id;
 
                         return (
                           <button
-                            key={filter}
-                            onClick={() => setSelectedFilter(filter)}
-                            className="relative rounded-full px-5 py-2 text-[10px] font-bold uppercase tracking-wider flex-shrink-0 cursor-pointer focus:outline-none transition-colors"
+                            key={filter.id}
+                            onClick={() => setSelectedFilter(filter.id)}
+                            className="relative rounded-full px-4 sm:px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider flex-shrink-0 cursor-pointer focus:outline-none transition-colors min-h-[40px]"
                           >
                             {isSel && (
                               <motion.div
@@ -643,54 +838,135 @@ export default function App() {
                               />
                             )}
                             <span className={`relative z-10 transition-colors duration-150 ${isSel ? 'text-on-primary font-extrabold' : 'text-on-surface-variant hover:text-on-surface'}`}>
-                              {filterLabel}
+                              {filter.label}
                             </span>
                           </button>
                         );
                       })}
                     </div>
 
-                    {/* Book Cards count feed with smooth layout transitions */}
-                    <motion.div layout className="space-y-4 mt-2 max-w-2xl mx-auto">
-                      {filteredReviews.length === 0 ? (
+                    {/* Sorting & Tag Filter Toolbar (Item 3.7) */}
+                    <div className="max-w-xl mx-auto flex flex-wrap items-center justify-between gap-2 pt-1 pb-1 text-xs">
+                      {/* Sort Dropdown */}
+                      <div className="flex items-center gap-1.5 bg-surface-container/70 border border-outline-variant/20 rounded-xl px-3 py-1.5">
+                        <span className="material-symbols-outlined notranslate text-sm text-primary" translate="no">
+                          sort
+                        </span>
+                        <span className="text-[10px] font-bold text-on-surface-variant/70 uppercase">
+                          {t.SORT_BY}:
+                        </span>
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as any)}
+                          className="bg-transparent text-xs font-semibold text-primary focus:outline-none cursor-pointer pr-1"
+                        >
+                          <option value="date" className="bg-surface-container text-on-surface">
+                            {t.SORT_DATE}
+                          </option>
+                          <option value="rating" className="bg-surface-container text-on-surface">
+                            {t.SORT_RATING}
+                          </option>
+                          <option value="title" className="bg-surface-container text-on-surface">
+                            {t.SORT_TITLE}
+                          </option>
+                          <option value="author" className="bg-surface-container text-on-surface">
+                            {t.SORT_AUTHOR}
+                          </option>
+                        </select>
+                      </div>
+
+                      {/* Active Tag Filter Indicator & Clear button (Item 3.7) */}
+                      {selectedTag && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          className="flex items-center gap-1.5 bg-primary/15 border border-primary/30 px-3 py-1 rounded-full text-xs text-primary"
+                        >
+                          <span className="material-symbols-outlined notranslate text-xs" translate="no">
+                            label
+                          </span>
+                          <span className="font-bold">
+                            {selectedTag.startsWith('#') ? selectedTag : `#${selectedTag}`}
+                          </span>
+                          <button
+                            onClick={() => setSelectedTag(null)}
+                            className="ml-1 hover:bg-primary/20 rounded-full p-0.5 cursor-pointer text-primary"
+                            title={t.CLEAR_FILTER}
+                          >
+                            <span className="material-symbols-outlined notranslate text-xs" translate="no">close</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </div>
+
+                    {/* Book Cards Grid: 1 col on mobile, 2 col on lg (>=1024px) (Item 3.9) */}
+                    {isLoadingBooks ? (
+                      /* Skeleton Loading state (Item 7.9) */
+                      <div
+                        role="status"
+                        aria-busy="true"
+                        aria-label={t.LOADING_DATA}
+                        className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3 max-w-5xl mx-auto"
+                      >
+                        <SkeletonBookCard />
+                        <SkeletonBookCard />
+                        <SkeletonBookCard />
+                        <SkeletonBookCard />
+                      </div>
+                    ) : (
+                      <motion.div layout className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3 max-w-5xl mx-auto">
+                        {filteredReviews.length === 0 ? (
                         <motion.div
                           initial={{ opacity: 0, scale: 0.96 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.2 }}
-                          className="bg-surface-container-low rounded-2xl border border-outline-variant/20 p-8 text-center"
+                          transition={{ duration: 0.16 }}
+                          className="col-span-full bg-surface-container-low rounded-2xl border border-outline-variant/20 p-8 text-center max-w-md mx-auto w-full my-4"
                         >
                           <span className="material-symbols-outlined notranslate text-5xl text-outline-variant/60 block mb-2" translate="no">
                             explore_off
                           </span>
                           <p className="font-serif text-sm font-semibold text-on-surface">
-                            {language === 'pt' ? 'Nenhum livro encontrado' : language === 'es' ? 'Libro no encontrado' : 'No books found'}
+                            {debouncedSearchQuery ? (
+                              <span>{t.NO_BOOKS_FOR_QUERY} <span className="text-primary italic">"{debouncedSearchQuery}"</span></span>
+                            ) : selectedTag ? (
+                              <span>{t.NO_BOOKS_FOR_TAG} <span className="text-primary italic">"{selectedTag}"</span></span>
+                            ) : (
+                              t.NO_BOOKS_FOUND
+                            )}
                           </p>
                           <p className="text-xs text-on-surface-variant/60 mt-1 max-w-xs mx-auto leading-normal">
-                            {searchQuery
-                              ? (language === 'pt' ? 'Nenhum livro encontrado na sua estante com esses termos.' : language === 'es' ? 'No se encontraron libros en tu estantería con estos términos.' : 'No books found in your shelf matching this query.')
-                              : t.EMPTY_LIBRARY_SUB}
+                            {debouncedSearchQuery || selectedTag ? (
+                              <button
+                                onClick={() => {
+                                  setSearchQuery('');
+                                  setSelectedTag(null);
+                                }}
+                                className="text-primary font-semibold hover:underline mt-1 block mx-auto cursor-pointer"
+                              >
+                                {t.CLEAR_FILTER}
+                              </button>
+                            ) : (
+                              t.EMPTY_LIBRARY_SUB
+                            )}
                           </p>
-                          {searchQuery ? (
+                          {debouncedSearchQuery ? (
                             <motion.button
                               whileTap={{ scale: 0.95 }}
                               onClick={() => {
-                                setExploreSearchQuery(searchQuery);
+                                setExploreSearchQuery(debouncedSearchQuery);
                                 setCurrentTab('EXPLORE');
                               }}
                               className="mt-4 bg-[#bf6fe5] text-white hover:bg-[#a14ac9] transition-all px-4 py-2.5 rounded-xl text-xs font-bold font-sans cursor-pointer shadow-md flex items-center gap-1.5 mx-auto"
                             >
                               <span className="material-symbols-outlined notranslate text-sm" translate="no">globe_uk</span>
-                              {language === 'pt' 
-                                ? `Buscar "${searchQuery}" no Acervo Global 🌐` 
-                                : language === 'es' 
-                                  ? `Buscar "${searchQuery}" en el Catálogo Global 🌐` 
-                                  : `Search "${searchQuery}" in Global Catalog 🌐`}
+                              <span>{t.SEARCH_GLOBAL_PROMPT}</span>
                             </motion.button>
                           ) : (
                             <motion.button
                               whileTap={{ scale: 0.95 }}
                               onClick={() => setIsFormOpen(true)}
-                              className="mt-4 bg-primary text-on-primary hover:bg-primary-container transition-colors px-4 py-2 rounded-xl text-xs font-bold font-sans cursor-pointer shadow-sm"
+                              className="mt-4 bg-primary text-on-primary hover:bg-primary-container transition-colors px-4 py-2 rounded-xl text-xs font-bold font-sans cursor-pointer shadow-sm mx-auto"
                             >
                               {t.ADD_REVIEW}
                             </motion.button>
@@ -709,12 +985,18 @@ export default function App() {
                               onDelete={handleDeleteReview}
                               onStatusChange={handleStatusChange}
                               onFavoriteToggle={handleFavoriteToggle}
+                              onRatingChange={handleRatingChange}
+                              onUpdateProgress={handleUpdateProgress}
+                              onTagClick={(tag) => setSelectedTag(selectedTag === tag ? null : tag)}
+                              activeTag={selectedTag}
+                              searchQuery={debouncedSearchQuery}
                               language={language}
                             />
                           ))}
                         </AnimatePresence>
                       )}
                     </motion.div>
+                    )}
                   </motion.section>
                 )}
 
@@ -734,6 +1016,7 @@ export default function App() {
                       onAddPresetToList={handleAddPresetRecommendation}
                       language={language}
                       initialSearchQuery={exploreSearchQuery}
+                      libraryBooks={reviews}
                     />
                   </motion.div>
                 )}
@@ -750,7 +1033,11 @@ export default function App() {
                     transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                     className="gpu-accelerated"
                   >
-                    <WritingView language={language} user={user} />
+                    <WritingView
+                      language={language}
+                      user={user}
+                      libraryBooks={reviews}
+                    />
                   </motion.div>
                 )}
 
@@ -771,6 +1058,20 @@ export default function App() {
                       reviews={reviews}
                       onLogout={handleLogout}
                       language={language}
+                      onImportReviews={async (imported) => {
+                        setReviews(imported);
+                        localStorage.setItem('bookshelf_reviews', JSON.stringify(imported));
+                        if (user?.uid) {
+                          try {
+                            for (const rev of imported) {
+                              const docRef = doc(db, `users/${user.uid}/reviews`, rev.id);
+                              await setDoc(docRef, rev);
+                            }
+                          } catch (err) {
+                            console.error("Falha ao sincronizar livros importados com o Firestore:", err);
+                          }
+                        }
+                      }}
                       onUpdateProfile={async (updatedUser) => {
                         setUser(updatedUser);
                         localStorage.setItem('bookshelf_user', JSON.stringify(updatedUser));
@@ -807,7 +1108,7 @@ export default function App() {
               </AnimatePresence>
             </main>
 
-            {/* Bottom floating plus button (FAB) trigger (only renders on Library library list view tab) */}
+            {/* Bottom floating plus button (FAB) trigger (only renders on Library list view tab on mobile) */}
             <AnimatePresence>
               {currentTab === 'LIBRARY' && (
                 <motion.button
@@ -821,16 +1122,17 @@ export default function App() {
                     setEditingReview(null);
                     setIsFormOpen(true);
                   }}
-                  className="fixed right-6 bottom-24 w-14 h-14 bg-primary text-on-primary rounded-full fab-shadow flex items-center justify-center cursor-pointer z-50 hover:bg-white hover:text-on-primary-container"
+                  className="fixed right-4 sm:right-6 bottom-20 sm:bottom-24 w-14 h-14 bg-primary text-on-primary rounded-full fab-shadow flex items-center justify-center cursor-pointer z-50 hover:bg-white hover:text-on-primary-container md:hidden"
                   title={t.ADD_REVIEW}
+                  aria-label={t.ADD_REVIEW}
                 >
                   <span className="material-symbols-outlined notranslate text-3xl font-bold" translate="no">add</span>
                 </motion.button>
               )}
             </AnimatePresence>
 
-            {/* Fixed Navigation Bottom bar with gliding spring indicator */}
-            <nav className="fixed bottom-0 left-0 w-full z-50 bg-[#231e25]/95 backdrop-blur-lg border-t border-outline-variant/15 flex justify-around items-center px-4 py-2.5 shadow-lg select-none">
+            {/* Mobile Touch Navigation Bottom bar (hidden on desktop/tablet, active on mobile with safe-area) */}
+            <nav className="fixed bottom-0 left-0 w-full z-50 bg-[#231e25]/95 backdrop-blur-lg border-t border-outline-variant/15 flex justify-around items-center px-4 pt-1.5 pb-safe shadow-lg select-none md:hidden">
               {(
                 [
                   { id: 'LIBRARY', icon: 'auto_stories', label: t.LIBRARY },
@@ -844,7 +1146,7 @@ export default function App() {
                   <button
                     key={tab.id}
                     onClick={() => setCurrentTab(tab.id)}
-                    className="relative flex flex-col items-center justify-center py-1 px-4 text-xs font-semibold focus:outline-none cursor-pointer group"
+                    className="relative flex flex-col items-center justify-center py-1 px-3 text-xs font-semibold focus:outline-none cursor-pointer group min-h-[44px] min-w-[56px]"
                   >
                     {isActive && (
                       <motion.div
@@ -854,7 +1156,7 @@ export default function App() {
                       />
                     )}
                     <span
-                      className={`material-symbols-outlined notranslate text-xl relative z-10 transition-transform duration-200 ${
+                      className={`material-symbols-outlined notranslate text-xl relative z-10 transition-transform duration-150 ${
                         isActive ? 'text-on-primary-container scale-110' : 'text-on-surface-variant group-hover:text-on-surface'
                       }`}
                       translate="no"
@@ -863,7 +1165,7 @@ export default function App() {
                       {tab.icon}
                     </span>
                     <span
-                      className={`text-[10px] relative z-10 tracking-tight transition-colors duration-200 ${
+                      className={`text-[10px] relative z-10 tracking-tight transition-colors duration-150 ${
                         isActive ? 'text-on-primary-container font-bold' : 'text-on-surface-variant group-hover:text-on-surface'
                       }`}
                     >

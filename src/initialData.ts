@@ -11,6 +11,8 @@ export const INITIAL_REVIEWS: BookReview[] = [
     reviewText: 'Uma análise brilhante sobre o sonho americano e a decadência social dos anos 20... O glamour e a tragédia de Jay Gatsby misturados com maestria.',
     tags: ['#Clássico', '#Drama', '#Anos20'],
     isFavorite: true,
+    pagesRead: 180,
+    totalPages: 180,
     createdAt: new Date('2026-05-15T10:00:00Z').toISOString()
   },
   {
@@ -23,6 +25,8 @@ export const INITIAL_REVIEWS: BookReview[] = [
     reviewText: 'Estou adorando o sistema de magia e o mundo Grisha. A Alina é uma protagonista interessante e cheia de potencial. A estética sombria e o mistério me fisgaram!',
     tags: ['#Fantasia', '#Grishaverse', '#Magia'],
     isFavorite: true,
+    pagesRead: 148,
+    totalPages: 358,
     createdAt: new Date('2026-05-20T14:30:00Z').toISOString()
   },
   {

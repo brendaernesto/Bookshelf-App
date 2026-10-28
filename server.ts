@@ -220,7 +220,7 @@ Format the entire output as an array containing JSON objects matching the schema
 
         console.log(`[Attempt 1] Seeking search results with googleSearch grounding...`);
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-2.5-flash",
           contents: prompt,
           config: {
             tools: [{ googleSearch: {} }],
@@ -243,7 +243,8 @@ Format the entire output as an array containing JSON objects matching the schema
                     description: "Genre tag elements starting with '#'"
                   },
                   buyLink: { type: Type.STRING, description: "Valid web search or store purchase link" },
-                  buyLinkText: { type: Type.STRING, description: "Store link description text, e.g., 'Comprar na Amazon', 'Ver no Google Books'" }
+                  buyLinkText: { type: Type.STRING, description: "Store link description text, e.g., 'Comprar na Amazon', 'Ver no Google Books'" },
+                  year: { type: Type.STRING, description: "Publication year of the work, e.g. '1997' or '2008'" }
                 },
                 required: ["id", "title", "author", "coverUrl", "rating", "snippet", "tags"]
               }
@@ -264,7 +265,7 @@ Format the entire output as an array containing JSON objects matching the schema
 Include official title, main author, real world average rating (1.0 to 5.0), coverUrl (using nice unsplash tags or 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=300&auto=format&fit=crop'), beautiful synopsis description, and 2-3 hashtag strings matching the genre. Also add a standard search buyLink ('https://www.google.com/search?q=livro+comprar+' + encoded title).`;
 
           const fallbackResponse = await ai.models.generateContent({
-            model: "gemini-3.5-flash",
+            model: "gemini-2.5-flash",
             contents: backupPrompt,
             config: {
               responseMimeType: "application/json",
@@ -281,7 +282,8 @@ Include official title, main author, real world average rating (1.0 to 5.0), cov
                     snippet: { type: Type.STRING },
                     tags: { type: Type.ARRAY, items: { type: Type.STRING } },
                     buyLink: { type: Type.STRING },
-                    buyLinkText: { type: Type.STRING }
+                    buyLinkText: { type: Type.STRING },
+                    year: { type: Type.STRING }
                   },
                   required: ["id", "title", "author", "coverUrl", "rating", "snippet", "tags"]
                 }
@@ -317,7 +319,7 @@ Include official title, main author, real world average rating (1.0 to 5.0), cov
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: "spa",
     });
     app.use(vite.middlewares);

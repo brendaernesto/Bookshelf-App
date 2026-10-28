@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <script>
+      // Gracefully prevent unhandled WebSocket rejections in environments where HMR WebSockets are not supported
+      window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason && (
+          (typeof event.reason === 'string' && event.reason.includes('WebSocket')) ||
+          (event.reason.message && event.reason.message.includes('WebSocket'))
+        )) {
+          event.preventDefault();
+        }
+      });
+    </script>
     <title>Bookshelf - your silent sanctuary to organize and cultive readings</title>
     <!-- SEO Optimization Meta Tags -->
     <meta name="description" content="Bookshelf - your silent sanctuary to organize and cultive readings. Organize seus livros físicos ou digitais, configure o progresso (Lendo, Concluído, Pausado, Quer Ler), escreva resenhas detalhadas e guarde suas citações favoritas no diário." />
@@ -35,7 +46,7 @@
     <link rel="apple-touch-icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'&gt;&lt;rect width='100' height='100' rx='24' fill='%23171219'/&gt;&lt;path d='M28 20C26 20 25 21 25 23V74C25 77 27 79 30 79H75V20H28Z' fill='%23bf6fe5'/&gt;&lt;path d='M31 20H71V73H31V20Z' fill='%23a14ac9'/&gt;&lt;path d='M36 29H64M36 41H64M36 53H53' stroke='%23ffffff' stroke-width='6' stroke-linecap='round' opacity='0.9'/&gt;&lt;path d='M25 72C25 72 25 76 29 76H75V72H25Z' fill='%235c1878'/&gt;&lt;/svg&gt;" />
     
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400..900;1,400..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400..900;1,400..900&family=Manrope:wght@200..800&family=Noto+Color+Emoji&display=swap" rel="stylesheet" />
     <!-- Material Symbols -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
   </head>

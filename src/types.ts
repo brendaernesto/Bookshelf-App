@@ -12,6 +12,8 @@ export interface BookReview {
   isFavorite: boolean;
   createdAt: string;
   userId?: string;
+  pagesRead?: number;
+  totalPages?: number;
 }
 
 export interface UserProfile {

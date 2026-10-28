@@ -8,6 +8,7 @@ export interface CatalogBook {
   tags: string[];
   buyLink?: string;
   buyLinkText?: string;
+  year?: number | string;
 }
 
 export const POPULAR_GLOBAL_CATALOG: CatalogBook[] = [

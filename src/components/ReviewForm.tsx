@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookReview, BookStatus } from '../types';
 import { TRANSLATIONS, Language } from '../translations';
+import BookCover from './BookCover';
 
 interface ReviewFormProps {
   editingReview: BookReview | null;
@@ -121,12 +122,21 @@ export default function ReviewForm({
     }
   };
 
+  const [titleError, setTitleError] = useState<string | null>(null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      alert(language === 'pt' ? 'Por favor, informe ao menos o título do livro.' : language === 'es' ? 'Por favor, ingrese al menos el título del libro.' : 'Please enter at least the book title.');
+      setTitleError(
+        language === 'pt'
+          ? 'Por favor, informe ao menos o título do livro.'
+          : language === 'es'
+          ? 'Por favor, ingrese al menos el título del libro.'
+          : 'Please enter at least the book title.'
+      );
       return;
     }
+    setTitleError(null);
     onSave({
       id: editingReview?.id,
       title: title.trim(),
@@ -136,7 +146,9 @@ export default function ReviewForm({
       coverUrl,
       reviewText: reviewText.trim(),
       tags,
-      isFavorite: editingReview ? editingReview.isFavorite : false
+      isFavorite: editingReview ? editingReview.isFavorite : false,
+      pagesRead: editingReview?.pagesRead,
+      totalPages: editingReview?.totalPages
     });
   };
 
@@ -157,7 +169,7 @@ export default function ReviewForm({
         {/* Cover Attachment Area */}
         <section className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex flex-col items-center">
           <label className="block text-xs font-bold text-primary uppercase tracking-wider mb-3">
-            {language === 'pt' ? 'Capa da Obra' : language === 'es' ? 'Portada de la Obra' : 'Book Cover'}
+            {t.PRESET_COVER_TITLE}
           </label>
           
           <div className="flex gap-4 items-center w-full max-w-md justify-center flex-wrap sm:flex-nowrap">
@@ -165,17 +177,18 @@ export default function ReviewForm({
             <div className="relative w-36 h-48 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low hover:bg-surface-container transition-all overflow-hidden flex flex-col items-center justify-center text-center p-2">
               {coverUrl ? (
                 <>
-                  <img
+                  <BookCover
                     src={coverUrl}
                     alt="Cover preview"
-                    referrerPolicy="no-referrer"
+                    title={title || 'Livro'}
+                    size="lg"
                     className="w-full h-full object-cover rounded-lg"
                   />
                   <button
                     type="button"
                     onClick={() => setCoverUrl('')}
                     className="absolute top-1.5 right-1.5 bg-background/90 text-error h-6 w-6 rounded-full flex items-center justify-center cursor-pointer shadow-md"
-                    title={language === 'pt' ? 'Remover capa' : language === 'es' ? 'Eliminar portada' : 'Remove cover'}
+                    title={t.DELETE}
                   >
                     <span className="material-symbols-outlined notranslate text-xs" translate="no">close</span>
                   </button>
@@ -184,7 +197,7 @@ export default function ReviewForm({
                 <div className="flex flex-col items-center text-on-surface-variant">
                   <span className="material-symbols-outlined notranslate text-4xl text-primary mb-1" translate="no">add_photo_alternate</span>
                   <p className="font-sans text-[10px] text-on-surface-variant/70 leading-relaxed px-2">
-                    {language === 'pt' ? 'Nenhuma capa' : language === 'es' ? 'Sin portada' : 'No cover added'}
+                    {t.NO_COVER}
                   </p>
                 </div>
               )}
@@ -194,7 +207,7 @@ export default function ReviewForm({
             <div className="flex flex-col gap-2 w-full max-w-xs shrink-0">
               <label className="bg-primary text-on-primary hover:bg-primary-container hover:scale-[1.01] transition-all px-4 py-2.5 rounded-xl text-center text-xs font-semibold cursor-pointer shadow-md active:scale-95 flex items-center justify-center gap-1.5">
                 <span className="material-symbols-outlined notranslate text-sm" translate="no">upload</span>
-                {language === 'pt' ? 'Upload de Imagem' : language === 'es' ? 'Subir Imagen' : 'Upload Image'}
+                {t.UPLOAD_COVER}
                 <input
                   type="file"
                   accept="image/*"
@@ -212,7 +225,7 @@ export default function ReviewForm({
                 className="bg-surface-container hover:bg-surface-container-high transition-colors text-[#dfb9ed] border border-[#dfb9ed]/20 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <span className="material-symbols-outlined notranslate text-sm" translate="no">palette</span>
-                {language === 'pt' ? 'Usar Capas Ilustrativas' : language === 'es' ? 'Usar Portadas Ilustrativas' : 'Use Preset Covers'}
+                {t.USE_PRESET_COVERS}
               </button>
 
               <button
@@ -224,7 +237,7 @@ export default function ReviewForm({
                 className="bg-surface-container-lowest hover:bg-surface-container-low transition-colors text-on-surface border border-outline-variant/30 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <span className="material-symbols-outlined notranslate text-sm" translate="no">link</span>
-                {language === 'pt' ? 'Inserir Link da Imagem' : language === 'es' ? 'Insertar Enlace de Imagen' : 'Insert Image Link'}
+                {t.INSERT_IMAGE_LINK}
               </button>
             </div>
           </div>
@@ -233,7 +246,7 @@ export default function ReviewForm({
           {showPresets && (
             <div className="mt-4 p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/20 w-full animate-fadeIn max-w-lg">
               <p className="text-[11px] font-bold text-primary mb-2 text-center uppercase tracking-wider">
-                {language === 'pt' ? 'Selecione uma Imagem Temática' : language === 'es' ? 'Seleccione una Imagen Temática' : 'Select a Thematic Image'}:
+                {t.SELECT_THEMATIC_IMAGE}:
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {PRESET_COVERS.map((cov, index) => (
@@ -265,7 +278,7 @@ export default function ReviewForm({
           {showUrlInput && (
             <div className="mt-4 p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/20 w-full animate-fadeIn max-w-lg">
               <label className="block text-[10px] uppercase font-bold text-primary mb-1 pl-1">
-                {language === 'pt' ? 'Cole o link da capa (HTTP/HTTPS):' : language === 'es' ? 'Pegue el enlace de la portada:' : 'Paste cover link (HTTP/HTTPS):'}
+                {t.PASTE_COVER_LINK}
               </label>
               <div className="flex gap-2">
                 <input
@@ -291,29 +304,42 @@ export default function ReviewForm({
         <section className="space-y-4 bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/30">
           <div>
             <label className="block font-sans text-xs font-semibold text-primary mb-1 ml-1" htmlFor="title-inp">
-              {language === 'pt' ? 'Título da Obra *' : language === 'es' ? 'Título de la Obra *' : 'Book Title *'}
+              {t.BOOK_TITLE_LABEL}
             </label>
             <input
               id="title-inp"
               type="text"
               required
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: O Nome do Vento"
-              className="w-full bg-transparent border-b-2 border-outline-variant focus:border-primary focus:outline-none py-2 px-1 text-on-surface placeholder:text-on-surface-variant/30 text-lg font-serif transition-colors"
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (titleError) setTitleError(null);
+              }}
+              placeholder={t.PLACEHOLDER_BOOK_TITLE}
+              className={`w-full bg-transparent border-b-2 ${
+                titleError ? 'border-error' : 'border-outline-variant'
+              } focus:border-primary focus:outline-none py-2 px-1 text-on-surface placeholder:text-on-surface-variant/60 text-lg font-serif transition-colors`}
+              aria-invalid={titleError ? 'true' : 'false'}
+              aria-describedby={titleError ? 'title-error-msg' : undefined}
             />
+            {titleError && (
+              <p id="title-error-msg" role="alert" className="text-xs text-error mt-1.5 flex items-center gap-1 font-medium">
+                <span className="material-symbols-outlined notranslate text-sm" translate="no">error</span>
+                <span>{titleError}</span>
+              </p>
+            )}
           </div>
 
           <div>
             <label className="block font-sans text-xs font-semibold text-primary mb-1 ml-1" htmlFor="author-inp">
-              {language === 'pt' ? 'Nome do Autor' : language === 'es' ? 'Nombre del Autor' : 'Author Name'}
+              {t.AUTHOR_NAME_LABEL}
             </label>
             <input
               id="author-inp"
               type="text"
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
-              placeholder="Ex: Patrick Rothfuss"
+              placeholder={t.PLACEHOLDER_BOOK_AUTHOR}
               className="w-full bg-transparent border-b-2 border-outline-variant focus:border-primary focus:outline-none py-2 px-1 text-on-surface placeholder:text-on-surface-variant/30 text-base transition-colors"
             />
           </div>
@@ -322,7 +348,7 @@ export default function ReviewForm({
         {/* Status Selection Row */}
         <section className="space-y-2 bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/30">
           <label className="block font-sans text-xs font-semibold text-primary ml-1 uppercase tracking-wider">
-            {language === 'pt' ? 'Status de Leitura' : language === 'es' ? 'Estado de Lectura' : 'Reading Status'}
+            {t.BOOK_STATUS}
           </label>
           <div className="grid grid-cols-3 gap-2">
             {(['LENDO', 'CONCLUÍDO', 'PAUSADO'] as BookStatus[]).map((st) => (
@@ -350,7 +376,7 @@ export default function ReviewForm({
         {/* Star Interactive Rating Selector */}
         <section className="space-y-2 bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/30">
           <label className="block font-sans text-xs font-semibold text-primary ml-1 uppercase tracking-wider">
-            {language === 'pt' ? 'Sua Avaliação (Estrelas)' : language === 'es' ? 'Tu Calificación (Estrellas)' : 'Your Rating (Stars)'}
+            {t.BOOK_RATING}
           </label>
           <div className="flex items-center gap-4">
             <div className="flex gap-1.5 whitespace-nowrap">
@@ -403,7 +429,7 @@ export default function ReviewForm({
         {/* Dynamic Tags, Genres and Tropes */}
         <section className="space-y-3 bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/30">
           <label className="block font-sans text-xs font-semibold text-primary ml-1" htmlFor="tag-field">
-            {language === 'pt' ? 'Gêneros, Tags e Tropes' : language === 'es' ? 'Géneros, Tags y Claves' : 'Genres, Tags and Topics'}
+            {t.GENRES_TAGS_LABEL}
           </label>
 
           {/* Chips list container */}
@@ -435,7 +461,7 @@ export default function ReviewForm({
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={handleTagKeyDown}
-              placeholder={language === 'pt' ? 'Adicionar tag (ex: #Romance, #Fantasia)' : language === 'es' ? 'Añadir tag (ej: #Romance, #Fantasía)' : 'Add tag (e.g. #Romance, #Fantasy)'}
+              placeholder={t.ADD_TAG_PLACEHOLDER}
               className="flex-grow bg-surface-container-low border border-outline-variant/40 rounded-xl px-4 py-2.5 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-on-surface-variant/40"
             />
             <button
@@ -447,24 +473,20 @@ export default function ReviewForm({
             </button>
           </div>
           <p className="text-[10px] text-on-surface-variant/60 italic pl-1">
-            {language === 'pt' 
-              ? 'Dica: Digite a tag e pressione Enter, vírgula ou clique no botão + para adicionar.' 
-              : language === 'es'
-              ? 'Consejo: Escribe el tag y presiona Enter o haz clic en + para añadir.'
-              : 'Tip: Type the tag and press Enter, comma or click + to add.'}
+            {t.TAG_TIP}
           </p>
         </section>
 
         {/* Text Area for Review Text */}
         <section className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/30">
           <label className="block font-sans text-xs font-semibold text-primary mb-2 ml-1" htmlFor="review-inp">
-            {language === 'pt' ? 'Sua Resenha Personalizada' : language === 'es' ? 'Tu Reseña Personalizada' : 'Your Custom Review'}
+            {t.YOUR_CUSTOM_REVIEW}
           </label>
           <textarea
             id="review-inp"
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
-            placeholder={language === 'pt' ? 'O que você achou dessa leitura?' : language === 'es' ? '¿Qué te pareció este libro?' : 'What did you think of this read?'}
+            placeholder={t.REVIEW_PLACEHOLDER}
             rows={5}
             className="w-full bg-transparent border-0 focus:ring-0 text-xs text-on-surface placeholder:text-on-surface-variant/40 resize-none px-1 py-1 leading-relaxed focus:outline-none"
           />
